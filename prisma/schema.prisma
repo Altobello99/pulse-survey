@@ -1,0 +1,189 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Department {
+  id              String           @id @default(cuid())
+  name            String           @unique
+  createdAt       DateTime         @default(now())
+  teams           Team[]
+  users           User[]
+  surveyResponses SurveyResponse[]
+  feedback        Feedback[]
+}
+
+model Team {
+  id              String           @id @default(cuid())
+  name            String
+  departmentId    String
+  department      Department       @relation(fields: [departmentId], references: [id])
+  createdAt       DateTime         @default(now())
+  users           User[]
+  surveyResponses SurveyResponse[]
+  actionItems     ActionItem[]
+  feedback        Feedback[]
+
+  @@unique([name, departmentId])
+}
+
+model User {
+  id                String             @id @default(cuid())
+  email             String             @unique
+  name              String
+  passwordHash      String
+  role              String             @default("employee")
+  jobTitle          String?
+  jobLevel          String?
+  hireDate          DateTime?
+  managerEmail      String?
+  departmentId      String
+  department        Department         @relation(fields: [departmentId], references: [id])
+  teamId            String?
+  team              Team?              @relation(fields: [teamId], references: [id])
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  surveysCreated    Survey[]
+  actionItems       ActionItem[]
+  surveyCompletions SurveyCompletion[]
+}
+
+model SurveyCompletion {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  surveyId    String
+  survey      Survey   @relation(fields: [surveyId], references: [id])
+  completedAt DateTime @default(now())
+
+  @@unique([userId, surveyId])
+}
+
+model Survey {
+  id                String             @id @default(cuid())
+  title             String
+  description       String?
+  status            String             @default("draft")
+  frequency         String?
+  startDate         DateTime
+  endDate           DateTime
+  publicToken       String?            @unique
+  allowAnonymous    Boolean            @default(false)
+  createdById       String
+  createdBy         User               @relation(fields: [createdById], references: [id])
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  questions         Question[]
+  responses         SurveyResponse[]
+  completions       SurveyCompletion[]
+  sentimentAnalyses SentimentAnalysis[]
+  anonymousTokens   AnonymousToken[]
+}
+
+// Tracks anonymous token use without linking to identity.
+// Stores just a fingerprint hash so the same browser/device can't submit twice.
+model AnonymousToken {
+  id          String   @id @default(cuid())
+  surveyId    String
+  survey      Survey   @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+  fingerprint String
+  usedAt      DateTime @default(now())
+
+  @@unique([surveyId, fingerprint])
+}
+
+model EmailLog {
+  id         String   @id @default(cuid())
+  recipient  String
+  subject    String
+  body       String
+  category   String
+  status     String   @default("pending")
+  sentAt     DateTime?
+  errorMsg   String?
+  createdAt  DateTime @default(now())
+}
+
+model Question {
+  id        String   @id @default(cuid())
+  surveyId  String
+  survey    Survey   @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+  text      String
+  type      String
+  required  Boolean  @default(true)
+  order     Int
+  options   String?
+  createdAt DateTime @default(now())
+  answers   Answer[]
+}
+
+model SurveyResponse {
+  id           String     @id @default(cuid())
+  surveyId     String
+  survey       Survey     @relation(fields: [surveyId], references: [id])
+  departmentId String
+  department   Department @relation(fields: [departmentId], references: [id])
+  teamId       String?
+  team         Team?      @relation(fields: [teamId], references: [id])
+  submittedAt  DateTime   @default(now())
+  answers      Answer[]
+}
+
+model Answer {
+  id               String         @id @default(cuid())
+  surveyResponseId String
+  surveyResponse   SurveyResponse @relation(fields: [surveyResponseId], references: [id], onDelete: Cascade)
+  questionId       String
+  question         Question       @relation(fields: [questionId], references: [id])
+  ratingValue      Int?
+  choiceValue      String?
+  textValue        String?
+  createdAt        DateTime       @default(now())
+}
+
+model SentimentAnalysis {
+  id         String   @id @default(cuid())
+  surveyId   String
+  survey     Survey   @relation(fields: [surveyId], references: [id])
+  questionId String?
+  sentiment  String
+  score      Float
+  themes     String
+  insights   String
+  summary    String
+  analyzedAt DateTime @default(now())
+}
+
+model Feedback {
+  id           String      @id @default(cuid())
+  message      String
+  category     String?
+  departmentId String?
+  department   Department? @relation(fields: [departmentId], references: [id])
+  teamId       String?
+  team         Team?       @relation(fields: [teamId], references: [id])
+  sentiment    String?
+  status       String      @default("new")
+  createdAt    DateTime    @default(now())
+}
+
+model ActionItem {
+  id               String    @id @default(cuid())
+  title            String
+  description      String?
+  status           String    @default("open")
+  priority         String    @default("medium")
+  dueDate          DateTime?
+  createdById      String
+  createdBy        User      @relation(fields: [createdById], references: [id])
+  teamId           String?
+  team             Team?     @relation(fields: [teamId], references: [id])
+  sourceSurveyId   String?
+  sourceFeedbackId String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+}
