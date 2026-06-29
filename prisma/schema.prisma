@@ -118,6 +118,7 @@ model Question {
   id        String   @id @default(cuid())
   surveyId  String
   survey    Survey   @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+  section   String?
   text      String
   type      String
   required  Boolean  @default(true)

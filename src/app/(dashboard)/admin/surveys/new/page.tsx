@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 interface QuestionDraft {
+  section: string;
   text: string;
   type: "rating" | "multiple_choice" | "free_text";
   required: boolean;
@@ -18,12 +19,13 @@ export default function NewSurveyPage() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [questions, setQuestions] = useState<QuestionDraft[]>([
-    { text: "", type: "rating", required: true, options: [] },
+    { section: "", text: "", type: "rating", required: true, options: [] },
   ]);
   const [saving, setSaving] = useState(false);
 
   function addQuestion() {
-    setQuestions([...questions, { text: "", type: "rating", required: true, options: [] }]);
+    const lastSection = questions[questions.length - 1]?.section || "";
+    setQuestions([...questions, { section: lastSection, text: "", type: "rating", required: true, options: [] }]);
   }
 
   function removeQuestion(idx: number) {
@@ -75,6 +77,7 @@ export default function NewSurveyPage() {
         questions: questions
           .filter((q) => q.text.trim())
           .map((q) => ({
+            section: q.section.trim() || undefined,
             text: q.text,
             type: q.type,
             required: q.required,
@@ -187,7 +190,13 @@ export default function NewSurveyPage() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-4">
+              <div className="grid gap-3 sm:grid-cols-[1fr_auto_auto] sm:items-center">
+                <input
+                  value={q.section}
+                  onChange={(e) => updateQuestion(idx, { section: e.target.value })}
+                  className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  placeholder="Section, e.g., Engagement & Alignment"
+                />
                 <select
                   value={q.type}
                   onChange={(e) => updateQuestion(idx, { type: e.target.value as any, options: e.target.value === "multiple_choice" ? ["", ""] : [] })}

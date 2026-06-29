@@ -17,6 +17,7 @@ import { useSession } from "next-auth/react";
 
 interface QuestionResult {
   id: string;
+  section: string | null;
   text: string;
   type: string;
   resultType: string;
@@ -141,6 +142,7 @@ export default function SurveyResultsPage({
   if (teamId) exportParams.set("teamId", teamId);
   if (location) exportParams.set("location", location);
   const exportHref = `/api/surveys/${surveyId}/export${exportParams.toString() ? `?${exportParams}` : ""}`;
+  const groupedQuestionResults = groupQuestionResults(result.questionResults);
 
   return (
     <div className="space-y-6">
@@ -337,86 +339,114 @@ export default function SurveyResultsPage({
       )}
 
       {/* Question Results */}
-      {!result.suppressed && <div className="space-y-4">
+      {!result.suppressed && <div className="space-y-6">
         <h2 className="text-lg font-semibold text-slate-900">Question Breakdown</h2>
-        {result.questionResults.map((q) => (
-          <div key={q.id} className="bg-white rounded-xl border border-slate-200 p-6">
-            <h3 className="font-medium text-slate-800 mb-4">{q.text}</h3>
-
-            {q.resultType === "rating" && (
-              q.total > 0 && q.distribution ? (
-                <div className="flex items-center gap-8">
-                  <div className="text-center">
-                    <p className="text-4xl font-bold text-primary">{q.average}</p>
-                    <p className="text-xs text-slate-500">avg of {q.total}</p>
-                  </div>
-                  <div className="min-w-0 flex-1 h-48">
-                    <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-                      <BarChart data={q.distribution}>
-                        <XAxis dataKey="rating" />
-                        <YAxis allowDecimals={false} />
-                        <Tooltip />
-                        <Bar dataKey="count" fill={COLORS.primary} radius={[4, 4, 0, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </div>
-              ) : (
-                <EmptyQuestionState label="No rating responses yet." />
-              )
-            )}
-
-            {q.resultType === "multiple_choice" && (
-              q.total > 0 && q.distribution ? (
-                <div className="flex items-center gap-8">
-                  <div className="min-w-0 flex-1 h-48">
-                    <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-                      <PieChart>
-                        <Pie
-                          data={q.distribution}
-                          dataKey="count"
-                          nameKey="option"
-                          cx="50%"
-                          cy="50%"
-                          outerRadius={70}
-                        >
-                          {q.distribution.map((_, i) => (
-                            <Cell key={i} fill={COLORS.chartPalette[i % COLORS.chartPalette.length]} />
-                          ))}
-                        </Pie>
-                        <Tooltip />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  </div>
-                </div>
-              ) : (
-                <EmptyQuestionState label="No choice responses yet." />
-              )
-            )}
-
-            {q.resultType === "free_text" && q.responses && (
-              <div className="space-y-2 max-h-80 overflow-y-auto">
-                {q.rawResponsesHidden && (
-                  <div className="p-3 bg-blue-50 text-blue-800 rounded-lg text-sm">
-                    Anonymous written comments are grouped into AI themes for managers. Raw comments are admin-only.
-                  </div>
-                )}
-                {q.responses.map((text, i) => (
-                  <div key={i} className="p-3 bg-slate-50 rounded-lg text-sm text-slate-700 flex gap-2">
-                    <span className="text-slate-400 shrink-0 text-xs mt-0.5">#{i + 1}</span>
-                    <span>&ldquo;{text}&rdquo;</span>
-                  </div>
-                ))}
-                {q.responses.length === 0 && (
-                  <p className="text-sm text-slate-400">No text responses yet.</p>
-                )}
+        {groupedQuestionResults.map((group) => (
+          <section key={group.section} className="space-y-4">
+            {group.section && (
+              <div className="border-b border-slate-200 pb-2">
+                <h3 className="text-sm font-semibold uppercase tracking-wide text-primary">
+                  {group.section}
+                </h3>
               </div>
             )}
-          </div>
+
+            {group.questions.map((q) => (
+              <div key={q.id} className="bg-white rounded-xl border border-slate-200 p-6">
+                <h4 className="font-medium text-slate-800 mb-4">{q.text}</h4>
+
+                {q.resultType === "rating" && (
+                  q.total > 0 && q.distribution ? (
+                    <div className="flex items-center gap-8">
+                      <div className="text-center">
+                        <p className="text-4xl font-bold text-primary">{q.average}</p>
+                        <p className="text-xs text-slate-500">avg of {q.total}</p>
+                      </div>
+                      <div className="min-w-0 flex-1 h-48">
+                        <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+                          <BarChart data={q.distribution}>
+                            <XAxis dataKey="rating" />
+                            <YAxis allowDecimals={false} />
+                            <Tooltip />
+                            <Bar dataKey="count" fill={COLORS.primary} radius={[4, 4, 0, 0]} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+                  ) : (
+                    <EmptyQuestionState label="No rating responses yet." />
+                  )
+                )}
+
+                {q.resultType === "multiple_choice" && (
+                  q.total > 0 && q.distribution ? (
+                    <div className="flex items-center gap-8">
+                      <div className="min-w-0 flex-1 h-48">
+                        <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+                          <PieChart>
+                            <Pie
+                              data={q.distribution}
+                              dataKey="count"
+                              nameKey="option"
+                              cx="50%"
+                              cy="50%"
+                              outerRadius={70}
+                            >
+                              {q.distribution.map((_, i) => (
+                                <Cell key={i} fill={COLORS.chartPalette[i % COLORS.chartPalette.length]} />
+                              ))}
+                            </Pie>
+                            <Tooltip />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+                  ) : (
+                    <EmptyQuestionState label="No choice responses yet." />
+                  )
+                )}
+
+                {q.resultType === "free_text" && q.responses && (
+                  <div className="space-y-2 max-h-80 overflow-y-auto">
+                    {q.rawResponsesHidden && (
+                      <div className="p-3 bg-blue-50 text-blue-800 rounded-lg text-sm">
+                        Anonymous written comments are grouped into AI themes for managers. Raw comments are admin-only.
+                      </div>
+                    )}
+                    {q.responses.map((text, i) => (
+                      <div key={i} className="p-3 bg-slate-50 rounded-lg text-sm text-slate-700 flex gap-2">
+                        <span className="text-slate-400 shrink-0 text-xs mt-0.5">#{i + 1}</span>
+                        <span>&ldquo;{text}&rdquo;</span>
+                      </div>
+                    ))}
+                    {q.responses.length === 0 && (
+                      <p className="text-sm text-slate-400">No text responses yet.</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+          </section>
         ))}
       </div>}
     </div>
   );
+}
+
+function groupQuestionResults(questions: QuestionResult[]) {
+  const groups: { section: string; questions: QuestionResult[] }[] = [];
+
+  for (const question of questions) {
+    const section = question.section?.trim() || "";
+    const existing = groups.find((group) => group.section === section);
+    if (existing) {
+      existing.questions.push(question);
+    } else {
+      groups.push({ section, questions: [question] });
+    }
+  }
+
+  return groups;
 }
 
 function EmptyQuestionState({ label }: { label: string }) {

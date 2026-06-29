@@ -46,7 +46,7 @@ export async function GET(
     "Team",
     "Location",
     "Submitted Hour",
-    ...survey.questions.map((q) => q.text),
+    ...survey.questions.map((q) => (q.section ? `${q.section}: ${q.text}` : q.text)),
   ];
 
   // Build rows (anonymized - no userId, no precise time)

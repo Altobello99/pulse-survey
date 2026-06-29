@@ -4,6 +4,7 @@ import { useEffect, useState, use } from "react";
 
 interface Question {
   id: string;
+  section: string | null;
   text: string;
   type: string;
   required: boolean;
@@ -120,6 +121,8 @@ export default function PublicSurveyPage({
 
   if (!survey) return null;
 
+  const groupedQuestions = groupQuestions(survey.questions);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-teal-50 to-blue-50 p-4 py-8">
       <div className="max-w-2xl mx-auto">
@@ -145,68 +148,80 @@ export default function PublicSurveyPage({
             </div>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-8">
-            {survey.questions.map((q, idx) => (
-              <div key={q.id} className="space-y-3">
-                <label className="block text-sm font-medium text-slate-800">
-                  {idx + 1}. {q.text}
-                  {q.required && <span className="text-red-500 ml-1">*</span>}
-                </label>
-
-                {q.type === "rating" && (
-                  <div className="flex gap-2">
-                    {[1, 2, 3, 4, 5].map((v) => (
-                      <button
-                        key={v}
-                        type="button"
-                        onClick={() => setAnswers({ ...answers, [q.id]: v })}
-                        className={`w-12 h-12 rounded-lg border-2 text-lg font-semibold transition ${
-                          answers[q.id] === v
-                            ? "border-primary bg-primary text-white"
-                            : "border-slate-200 text-slate-600 hover:border-primary/50"
-                        }`}
-                      >
-                        {v}
-                      </button>
-                    ))}
+          <form onSubmit={handleSubmit} className="space-y-10">
+            {groupedQuestions.map((group) => (
+              <section key={group.section} className="space-y-6">
+                {group.section && (
+                  <div className="border-b border-slate-200 pb-2">
+                    <h2 className="text-sm font-semibold uppercase tracking-wide text-primary">
+                      {group.section}
+                    </h2>
                   </div>
                 )}
 
-                {q.type === "multiple_choice" && q.options && (
-                  <div className="space-y-2">
-                    {(JSON.parse(q.options) as string[]).map((opt) => (
-                      <label
-                        key={opt}
-                        className={`flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition ${
-                          answers[q.id] === opt
-                            ? "border-primary bg-primary/5"
-                            : "border-slate-200 hover:border-slate-300"
-                        }`}
-                      >
-                        <input
-                          type="radio"
-                          name={q.id}
-                          value={opt}
-                          checked={answers[q.id] === opt}
-                          onChange={() => setAnswers({ ...answers, [q.id]: opt })}
-                          className="accent-primary"
-                        />
-                        <span className="text-sm text-slate-700">{opt}</span>
-                      </label>
-                    ))}
-                  </div>
-                )}
+                {group.questions.map(({ question: q, index }) => (
+                  <div key={q.id} className="space-y-3">
+                    <label className="block text-sm font-medium text-slate-800">
+                      {index + 1}. {q.text}
+                      {q.required && <span className="text-red-500 ml-1">*</span>}
+                    </label>
 
-                {q.type === "free_text" && (
-                  <textarea
-                    value={answers[q.id] || ""}
-                    onChange={(e) => setAnswers({ ...answers, [q.id]: e.target.value })}
-                    rows={4}
-                    className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary resize-none"
-                    placeholder="Share your thoughts..."
-                  />
-                )}
-              </div>
+                    {q.type === "rating" && (
+                      <div className="flex gap-2">
+                        {[1, 2, 3, 4, 5].map((v) => (
+                          <button
+                            key={v}
+                            type="button"
+                            onClick={() => setAnswers({ ...answers, [q.id]: v })}
+                            className={`w-12 h-12 rounded-lg border-2 text-lg font-semibold transition ${
+                              answers[q.id] === v
+                                ? "border-primary bg-primary text-white"
+                                : "border-slate-200 text-slate-600 hover:border-primary/50"
+                            }`}
+                          >
+                            {v}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                    {q.type === "multiple_choice" && q.options && (
+                      <div className="space-y-2">
+                        {(JSON.parse(q.options) as string[]).map((opt) => (
+                          <label
+                            key={opt}
+                            className={`flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition ${
+                              answers[q.id] === opt
+                                ? "border-primary bg-primary/5"
+                                : "border-slate-200 hover:border-slate-300"
+                            }`}
+                          >
+                            <input
+                              type="radio"
+                              name={q.id}
+                              value={opt}
+                              checked={answers[q.id] === opt}
+                              onChange={() => setAnswers({ ...answers, [q.id]: opt })}
+                              className="accent-primary"
+                            />
+                            <span className="text-sm text-slate-700">{opt}</span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+
+                    {q.type === "free_text" && (
+                      <textarea
+                        value={answers[q.id] || ""}
+                        onChange={(e) => setAnswers({ ...answers, [q.id]: e.target.value })}
+                        rows={4}
+                        className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary resize-none"
+                        placeholder="Share your thoughts..."
+                      />
+                    )}
+                  </div>
+                ))}
+              </section>
             ))}
 
             {error && (
@@ -225,4 +240,20 @@ export default function PublicSurveyPage({
       </div>
     </div>
   );
+}
+
+function groupQuestions(questions: Question[]) {
+  const groups: { section: string; questions: { question: Question; index: number }[] }[] = [];
+
+  questions.forEach((question, index) => {
+    const section = question.section?.trim() || "";
+    const existing = groups.find((group) => group.section === section);
+    if (existing) {
+      existing.questions.push({ question, index });
+    } else {
+      groups.push({ section, questions: [{ question, index }] });
+    }
+  });
+
+  return groups;
 }

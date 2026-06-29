@@ -8,6 +8,7 @@ const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
 type QuestionInput = {
+  section: string;
   text: string;
   type: "rating" | "free_text";
   required?: boolean;
@@ -18,50 +19,62 @@ const previousSurveyTitles = [surveyTitle, "Safety & Leadership Behaviours Pulse
 
 const questions: QuestionInput[] = [
   {
+    section: "Engagement & Alignment",
     text: "Do you clearly understand Clutch's business priorities?",
     type: "rating",
   },
   {
+    section: "Engagement & Alignment",
     text: "How confident do you feel your work directly contributes to Clutch's business goals?",
     type: "rating",
   },
   {
+    section: "Communication & Collaboration",
     text: "How well do you feel your team and other teams collaborate to achieve shared goals?",
     type: "rating",
   },
   {
+    section: "Total Rewards & Recognition",
     text: "Do you feel recognized for your contributions directly to business results?",
     type: "rating",
   },
   {
+    section: "Work Safety",
     text: "Do you feel safe performing your job?",
     type: "rating",
   },
   {
+    section: "Facility Experience",
     text: "Are your tools, technology, and systems easy to use and supportive of productivity?",
     type: "rating",
   },
   {
+    section: "Workload",
     text: "Do you have a manageable and sustainable workload?",
     type: "rating",
   },
   {
+    section: "Learning",
     text: "Do you have access to adequate learning resources and tools to perform your job effectively?",
     type: "rating",
   },
   {
+    section: "Growth & Development",
     text: "Do you see a clear opportunity to grow and develop your career at Clutch?",
     type: "rating",
   },
   {
+    section: "Manager Support",
     text: "How would you rate your working relationship with your manager?",
     type: "rating",
   },
   {
+    section: "Senior Leadership Visibility",
     text: "Are you satisfied with the frequency and transparency of communication from senior leadership?",
     type: "rating",
   },
   {
+    section: "Ending Questions",
     text: "What one thing would help you or your team drive better results this quarter?",
     type: "free_text",
     required: false,
@@ -114,6 +127,7 @@ async function main() {
       createdById: admin.id,
       questions: {
         create: questions.map((question, order) => ({
+          section: question.section,
           text: question.text,
           type: question.type,
           required: question.required ?? true,

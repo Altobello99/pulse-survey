@@ -72,6 +72,7 @@ export async function POST(request: NextRequest) {
       questions: {
         create: (questions || []).map((q: any, i: number) => ({
           text: q.text,
+          section: q.section?.trim() || null,
           type: q.type,
           required: q.required ?? true,
           order: i,

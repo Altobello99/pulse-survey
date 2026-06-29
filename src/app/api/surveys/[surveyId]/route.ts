@@ -63,6 +63,7 @@ export async function PUT(
       data: questions.map((q: any, i: number) => ({
         surveyId,
         text: q.text,
+        section: q.section?.trim() || null,
         type: q.type,
         required: q.required ?? true,
         order: i,
