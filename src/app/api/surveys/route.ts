@@ -21,14 +21,15 @@ export async function GET() {
   });
   const completedIds = new Set(completions.map((c) => c.surveyId));
 
-  // Employees see active surveys and closed/completed survey states, but never results.
+  // Employees only see surveys that are actively open right now. Historical,
+  // draft, and closed surveys are admin/manager-only.
   if (session.user.role === "employee") {
     const now = new Date();
     const filtered = surveys.filter(
       (s) =>
-        s.status === "active" ||
-        s.status === "closed" ||
-        new Date(s.endDate) < now
+        s.status === "active" &&
+        new Date(s.startDate) <= now &&
+        new Date(s.endDate) >= now
     );
 
     return Response.json({
