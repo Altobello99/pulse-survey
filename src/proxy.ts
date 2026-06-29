@@ -11,6 +11,7 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith("/api/auth") ||
     pathname === "/api/integrations/bamboohr/sync" ||
     pathname === "/login" ||
+    pathname === "/reset-cache" ||
     pathname === "/manifest.json" ||
     pathname === "/sw.js" ||
     pathname.startsWith("/icon") ||
