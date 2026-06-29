@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, use } from "react";
+import { useCallback, useEffect, useState, use } from "react";
 import {
   PieChart,
   Pie,
@@ -14,7 +14,6 @@ import {
 } from "recharts";
 import { COLORS } from "@/lib/constants";
 import { useSession } from "next-auth/react";
-import PublicLinkPanel from "@/components/surveys/PublicLinkPanel";
 
 interface QuestionResult {
   id: string;
@@ -24,6 +23,7 @@ interface QuestionResult {
   average?: number;
   distribution?: { rating?: number; option?: string; count: number }[];
   responses?: string[];
+  rawResponsesHidden?: boolean;
   total: number;
 }
 
@@ -43,10 +43,16 @@ interface DeptBreakdown {
   completions: number;
   participationRate: number;
   avgRating: number;
+  suppressed?: boolean;
+}
+
+interface FilterOption {
+  id: string;
+  name: string;
 }
 
 interface ResultData {
-  survey: { id: string; title: string; status: string; allowAnonymous: boolean; publicToken: string | null };
+  survey: { id: string; title: string; status: string };
   questionResults: QuestionResult[];
   participationRate: number;
   totalResponses: number;
@@ -54,6 +60,15 @@ interface ResultData {
   completions: number;
   sentiment: SentimentData | null;
   departmentBreakdown: DeptBreakdown[];
+  teamBreakdown: DeptBreakdown[];
+  locationBreakdown: DeptBreakdown[];
+  filterOptions: {
+    departments: FilterOption[];
+    teams: FilterOption[];
+    locations: string[];
+  };
+  suppressed?: boolean;
+  suppressionMessage?: string;
 }
 
 const SENTIMENT_COLORS = {
@@ -73,17 +88,25 @@ export default function SurveyResultsPage({
   const [result, setResult] = useState<ResultData | null>(null);
   const [loading, setLoading] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
+  const [departmentId, setDepartmentId] = useState("");
+  const [teamId, setTeamId] = useState("");
+  const [location, setLocation] = useState("");
 
-  function fetchResults() {
-    fetch(`/api/surveys/${surveyId}/results`)
+  const fetchResults = useCallback(() => {
+    const params = new URLSearchParams();
+    if (departmentId) params.set("departmentId", departmentId);
+    if (teamId) params.set("teamId", teamId);
+    if (location) params.set("location", location);
+
+    fetch(`/api/surveys/${surveyId}/results${params.toString() ? `?${params}` : ""}`)
       .then((r) => r.json())
       .then((d) => setResult(d.data))
       .finally(() => setLoading(false));
-  }
+  }, [surveyId, departmentId, teamId, location]);
 
   useEffect(() => {
     fetchResults();
-  }, [surveyId]);
+  }, [fetchResults]);
 
   async function runAnalysis() {
     setAnalyzing(true);
@@ -113,6 +136,11 @@ export default function SurveyResultsPage({
   const sentiment = result.sentiment;
   const themes: string[] = sentiment ? JSON.parse(sentiment.themes) : [];
   const insights: string[] = sentiment ? JSON.parse(sentiment.insights) : [];
+  const exportParams = new URLSearchParams();
+  if (departmentId) exportParams.set("departmentId", departmentId);
+  if (teamId) exportParams.set("teamId", teamId);
+  if (location) exportParams.set("location", location);
+  const exportHref = `/api/surveys/${surveyId}/export${exportParams.toString() ? `?${exportParams}` : ""}`;
 
   return (
     <div className="space-y-6">
@@ -131,7 +159,7 @@ export default function SurveyResultsPage({
               {analyzing ? "Analyzing..." : "Run AI Analysis"}
             </button>
             <a
-              href={`/api/surveys/${surveyId}/export`}
+              href={exportHref}
               className="px-4 py-2 border border-slate-300 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 transition"
             >
               Export CSV
@@ -149,6 +177,61 @@ export default function SurveyResultsPage({
           </div>
         )}
       </div>
+
+      {(session?.user.role === "admin" || session?.user.role === "manager") && (
+        <div className="bg-white rounded-xl border border-slate-200 p-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <select
+              value={departmentId}
+              onChange={(e) => setDepartmentId(e.target.value)}
+              className="px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+            >
+              <option value="">All departments</option>
+              {result.filterOptions?.departments.map((department) => (
+                <option key={department.id} value={department.id}>{department.name}</option>
+              ))}
+            </select>
+            <select
+              value={teamId}
+              onChange={(e) => setTeamId(e.target.value)}
+              className="px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+            >
+              <option value="">All teams</option>
+              {result.filterOptions?.teams.map((team) => (
+                <option key={team.id} value={team.id}>{team.name}</option>
+              ))}
+            </select>
+            <select
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+              className="px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+            >
+              <option value="">All locations</option>
+              {result.filterOptions?.locations.map((option) => (
+                <option key={option} value={option}>{option}</option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={() => {
+                setDepartmentId("");
+                setTeamId("");
+                setLocation("");
+              }}
+              className="px-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-700 hover:bg-slate-50"
+            >
+              Clear filters
+            </button>
+          </div>
+        </div>
+      )}
+
+      {result.suppressed && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+          <strong className="text-amber-900">Results hidden for anonymity.</strong>{" "}
+          {result.suppressionMessage}
+        </div>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -169,7 +252,7 @@ export default function SurveyResultsPage({
       </div>
 
       {/* Sentiment Analysis */}
-      {sentiment && (
+      {!result.suppressed && sentiment && (
         <div className="bg-white rounded-xl border border-slate-200 p-6">
           <h2 className="text-lg font-semibold text-slate-900 mb-4">AI Sentiment Analysis</h2>
           <p className="text-sm text-slate-600 mb-4">{sentiment.summary}</p>
@@ -197,15 +280,6 @@ export default function SurveyResultsPage({
             </div>
           </div>
         </div>
-      )}
-
-      {/* Admin: Public Link */}
-      {session?.user.role === "admin" && (
-        <PublicLinkPanel
-          surveyId={result.survey.id}
-          initialEnabled={result.survey.allowAnonymous}
-          initialToken={result.survey.publicToken}
-        />
       )}
 
       {/* Admin: Department Breakdown */}
@@ -240,7 +314,7 @@ export default function SurveyResultsPage({
                     </div>
                   </td>
                   <td className="py-3">
-                    {dept.responses >= 3 ? (
+                    {!dept.suppressed ? (
                       <span className={`font-semibold ${dept.avgRating >= 4 ? "text-emerald-600" : dept.avgRating >= 3 ? "text-amber-600" : "text-red-600"}`}>
                         {dept.avgRating || "N/A"}
                       </span>
@@ -255,59 +329,78 @@ export default function SurveyResultsPage({
         </div>
       )}
 
+      {!result.suppressed && (result.teamBreakdown?.length > 0 || result.locationBreakdown?.length > 0) && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <BreakdownList title="Team Breakdown" rows={result.teamBreakdown || []} />
+          <BreakdownList title="Location Breakdown" rows={result.locationBreakdown || []} />
+        </div>
+      )}
+
       {/* Question Results */}
-      <div className="space-y-4">
+      {!result.suppressed && <div className="space-y-4">
         <h2 className="text-lg font-semibold text-slate-900">Question Breakdown</h2>
         {result.questionResults.map((q) => (
           <div key={q.id} className="bg-white rounded-xl border border-slate-200 p-6">
             <h3 className="font-medium text-slate-800 mb-4">{q.text}</h3>
 
-            {q.resultType === "rating" && q.distribution && (
-              <div className="flex items-center gap-8">
-                <div className="text-center">
-                  <p className="text-4xl font-bold text-primary">{q.average}</p>
-                  <p className="text-xs text-slate-500">avg of {q.total}</p>
+            {q.resultType === "rating" && (
+              q.total > 0 && q.distribution ? (
+                <div className="flex items-center gap-8">
+                  <div className="text-center">
+                    <p className="text-4xl font-bold text-primary">{q.average}</p>
+                    <p className="text-xs text-slate-500">avg of {q.total}</p>
+                  </div>
+                  <div className="min-w-0 flex-1 h-48">
+                    <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+                      <BarChart data={q.distribution}>
+                        <XAxis dataKey="rating" />
+                        <YAxis allowDecimals={false} />
+                        <Tooltip />
+                        <Bar dataKey="count" fill={COLORS.primary} radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
                 </div>
-                <div className="flex-1 h-48">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={q.distribution}>
-                      <XAxis dataKey="rating" />
-                      <YAxis allowDecimals={false} />
-                      <Tooltip />
-                      <Bar dataKey="count" fill={COLORS.primary} radius={[4, 4, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
+              ) : (
+                <EmptyQuestionState label="No rating responses yet." />
+              )
             )}
 
-            {q.resultType === "multiple_choice" && q.distribution && (
-              <div className="flex items-center gap-8">
-                <div className="flex-1 h-48">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={q.distribution}
-                        dataKey="count"
-                        nameKey="option"
-                        cx="50%"
-                        cy="50%"
-                        outerRadius={70}
-                        label={(entry: any) => `${entry.option}: ${entry.count}`}
-                      >
-                        {q.distribution.map((_, i) => (
-                          <Cell key={i} fill={COLORS.chartPalette[i % COLORS.chartPalette.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip />
-                    </PieChart>
-                  </ResponsiveContainer>
+            {q.resultType === "multiple_choice" && (
+              q.total > 0 && q.distribution ? (
+                <div className="flex items-center gap-8">
+                  <div className="min-w-0 flex-1 h-48">
+                    <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+                      <PieChart>
+                        <Pie
+                          data={q.distribution}
+                          dataKey="count"
+                          nameKey="option"
+                          cx="50%"
+                          cy="50%"
+                          outerRadius={70}
+                        >
+                          {q.distribution.map((_, i) => (
+                            <Cell key={i} fill={COLORS.chartPalette[i % COLORS.chartPalette.length]} />
+                          ))}
+                        </Pie>
+                        <Tooltip />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <EmptyQuestionState label="No choice responses yet." />
+              )
             )}
 
             {q.resultType === "free_text" && q.responses && (
               <div className="space-y-2 max-h-80 overflow-y-auto">
+                {q.rawResponsesHidden && (
+                  <div className="p-3 bg-blue-50 text-blue-800 rounded-lg text-sm">
+                    Anonymous written comments are grouped into AI themes for managers. Raw comments are admin-only.
+                  </div>
+                )}
                 {q.responses.map((text, i) => (
                   <div key={i} className="p-3 bg-slate-50 rounded-lg text-sm text-slate-700 flex gap-2">
                     <span className="text-slate-400 shrink-0 text-xs mt-0.5">#{i + 1}</span>
@@ -319,6 +412,46 @@ export default function SurveyResultsPage({
                 )}
               </div>
             )}
+          </div>
+        ))}
+      </div>}
+    </div>
+  );
+}
+
+function EmptyQuestionState({ label }: { label: string }) {
+  return (
+    <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-500">
+      {label}
+    </div>
+  );
+}
+
+function BreakdownList({ title, rows }: { title: string; rows: DeptBreakdown[] }) {
+  if (rows.length === 0) return null;
+
+  return (
+    <div className="bg-white rounded-xl border border-slate-200 p-6">
+      <h2 className="text-lg font-semibold text-slate-900 mb-4">{title}</h2>
+      <div className="space-y-3">
+        {rows.map((row) => (
+          <div key={row.id} className="border border-slate-100 rounded-lg p-3">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="font-medium text-slate-900">{row.name}</p>
+                <p className="text-xs text-slate-500">
+                  {row.completions} completions &middot; {row.employeeCount} employees
+                </p>
+              </div>
+              {row.suppressed ? (
+                <span className="text-xs text-slate-400 italic">Too few responses</span>
+              ) : (
+                <span className="font-semibold text-primary">{row.avgRating || "N/A"}</span>
+              )}
+            </div>
+            <div className="mt-2 h-2 bg-slate-100 rounded-full overflow-hidden">
+              <div className="h-full bg-primary rounded-full" style={{ width: `${row.participationRate}%` }} />
+            </div>
           </div>
         ))}
       </div>

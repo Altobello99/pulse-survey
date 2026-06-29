@@ -8,7 +8,6 @@ import { cn, getInitials } from "@/lib/utils";
 const navItems = {
   employee: [
     { href: "/surveys", label: "Surveys", icon: "M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" },
-    { href: "/feedback", label: "Feedback", icon: "M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" },
   ],
   manager: [
     { href: "/manager", label: "Dashboard", icon: "M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1" },
@@ -32,6 +31,10 @@ export default function Sidebar({ open, onClose }: { open: boolean; onClose: () 
   const { data: session } = useSession();
   const role = (session?.user?.role || "employee") as keyof typeof navItems;
   const items = navItems[role] || navItems.employee;
+  const adminLoginId = session?.user?.loginId || "admin";
+  const displayName = role === "admin" ? "Admin" : session?.user?.name || "";
+  const displayDetail = role === "admin" ? `User ID: ${adminLoginId}` : session?.user?.email || "";
+  const displayInitials = role === "admin" ? "AD" : displayName ? getInitials(displayName) : "?";
 
   return (
     <>
@@ -85,11 +88,11 @@ export default function Sidebar({ open, onClose }: { open: boolean; onClose: () 
         <div className="p-3 border-t border-white/10">
           <div className="flex items-center gap-3 px-3 py-2">
             <div className="w-8 h-8 rounded-full bg-primary/20 text-primary flex items-center justify-center text-xs font-bold">
-              {session?.user?.name ? getInitials(session.user.name) : "?"}
+              {displayInitials}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate">{session?.user?.name}</p>
-              <p className="text-xs text-slate-400 truncate">{session?.user?.email}</p>
+              <p className="text-sm font-medium truncate">{displayName}</p>
+              <p className="text-xs text-slate-400 truncate">{displayDetail}</p>
             </div>
           </div>
           <button

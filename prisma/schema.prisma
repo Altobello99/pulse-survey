@@ -41,6 +41,12 @@ model User {
   jobLevel          String?
   hireDate          DateTime?
   managerEmail      String?
+  bambooHrId        String?
+  employeeNumber    String?
+  status            String             @default("active")
+  location          String?
+  division          String?
+  bambooSyncedAt    DateTime?
   departmentId      String
   department        Department         @relation(fields: [departmentId], references: [id])
   teamId            String?
@@ -129,6 +135,9 @@ model SurveyResponse {
   department   Department @relation(fields: [departmentId], references: [id])
   teamId       String?
   team         Team?      @relation(fields: [teamId], references: [id])
+  managerEmail String?
+  location     String?
+  division     String?
   submittedAt  DateTime   @default(now())
   answers      Answer[]
 }

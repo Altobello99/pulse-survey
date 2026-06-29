@@ -56,7 +56,7 @@ export default function SurveysPage() {
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
           </svg>
           <div className="text-sm text-emerald-800">
-            <strong className="text-emerald-900">All responses are confidential.</strong> Your answers are never linked to your identity, and results are aggregated to protect anonymity.
+            <strong className="text-emerald-900">Your feedback is anonymous.</strong> Google sign-in confirms you are an active Clutch employee and prevents duplicate submissions. Answers are stored separately from login details, and results are reported only when at least 3 people respond.
           </div>
         </div>
       )}
@@ -76,6 +76,8 @@ export default function SurveysPage() {
               href={
                 survey.completed
                   ? "#"
+                  : isClosed(survey) && session?.user.role === "employee"
+                  ? `/surveys/${survey.id}`
                   : session?.user.role === "employee"
                   ? `/surveys/${survey.id}`
                   : `/surveys/${survey.id}/results`
@@ -106,6 +108,11 @@ export default function SurveysPage() {
                         Completed
                       </span>
                     )}
+                    {!survey.completed && isClosed(survey) && (
+                      <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600">
+                        Closed
+                      </span>
+                    )}
                   </div>
                   {survey.description && (
                     <p className="text-sm text-slate-500 mb-2">
@@ -117,9 +124,14 @@ export default function SurveysPage() {
                     {survey._count.responses} responses
                   </p>
                 </div>
-                {!survey.completed && session?.user.role === "employee" && (
+                {!survey.completed && !isClosed(survey) && session?.user.role === "employee" && (
                   <span className="shrink-0 px-4 py-2 bg-primary text-white text-sm font-medium rounded-lg">
                     Take Survey
+                  </span>
+                )}
+                {!survey.completed && isClosed(survey) && session?.user.role === "employee" && (
+                  <span className="shrink-0 px-4 py-2 bg-slate-100 text-slate-600 text-sm font-medium rounded-lg">
+                    View Status
                   </span>
                 )}
               </div>
@@ -130,3 +142,6 @@ export default function SurveysPage() {
     </div>
   );
 }
+  function isClosed(survey: Survey) {
+    return survey.status !== "active" || new Date(survey.endDate) < new Date();
+  }

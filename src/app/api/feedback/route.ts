@@ -2,18 +2,18 @@ import { NextRequest } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import type { Prisma } from "@/generated/prisma/client";
 
 export async function GET() {
   const session = await getServerSession(authOptions);
   if (!session) return Response.json({ error: "Unauthorized" }, { status: 401 });
+  if (session.user.role === "employee") {
+    return Response.json({ error: "Forbidden" }, { status: 403 });
+  }
 
-  const where: any = {};
+  const where: Prisma.FeedbackWhereInput = {};
   if (session.user.role === "manager") {
     where.departmentId = session.user.departmentId;
-  }
-  // Employees can see addressed feedback only
-  if (session.user.role === "employee") {
-    where.status = "addressed";
   }
 
   const feedback = await prisma.feedback.findMany({
@@ -28,6 +28,9 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session) return Response.json({ error: "Unauthorized" }, { status: 401 });
+  if (session.user.role === "employee") {
+    return Response.json({ error: "Feedback is only available to managers and admins" }, { status: 403 });
+  }
 
   const body = await request.json();
   const { message, category, includeDepartment } = body;

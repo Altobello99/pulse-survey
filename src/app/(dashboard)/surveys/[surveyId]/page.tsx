@@ -16,14 +16,19 @@ interface Survey {
   title: string;
   description: string | null;
   completed: boolean;
+  status: string;
+  startDate: string;
+  endDate: string;
   questions: Question[];
 }
+
+type AnswerValue = string | number | undefined;
 
 export default function TakeSurveyPage({ params }: { params: Promise<{ surveyId: string }> }) {
   const { surveyId } = use(params);
   const router = useRouter();
   const [survey, setSurvey] = useState<Survey | null>(null);
-  const [answers, setAnswers] = useState<Record<string, any>>({});
+  const [answers, setAnswers] = useState<Record<string, AnswerValue>>({});
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -95,7 +100,7 @@ export default function TakeSurveyPage({ params }: { params: Promise<{ surveyId:
           </div>
           <h2 className="text-xl font-bold text-slate-900 mb-2">Thank you!</h2>
           <p className="text-slate-500 mb-6">
-            Your response has been submitted anonymously. Your feedback helps make our workplace better.
+            You already submitted this survey. Your anonymous response has been recorded and cannot be submitted again.
           </p>
           <button
             onClick={() => router.push("/surveys")}
@@ -110,6 +115,35 @@ export default function TakeSurveyPage({ params }: { params: Promise<{ surveyId:
 
   if (!survey) {
     return <div className="text-slate-500">Survey not found.</div>;
+  }
+
+  const surveyClosed =
+    survey.status !== "active" ||
+    new Date(survey.startDate) > new Date() ||
+    new Date(survey.endDate) < new Date();
+
+  if (surveyClosed) {
+    return (
+      <div className="max-w-2xl mx-auto">
+        <div className="bg-white rounded-xl border border-slate-200 p-12 text-center">
+          <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-4">
+            <svg className="w-8 h-8 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <h2 className="text-xl font-bold text-slate-900 mb-2">Survey closed</h2>
+          <p className="text-slate-500 mb-6">
+            This survey is no longer accepting responses. Thank you for taking part in future pulse surveys.
+          </p>
+          <button
+            onClick={() => router.push("/surveys")}
+            className="px-6 py-2.5 bg-primary text-white rounded-lg hover:bg-primary-dark transition"
+          >
+            Back to Surveys
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -131,13 +165,12 @@ export default function TakeSurveyPage({ params }: { params: Promise<{ surveyId:
               </svg>
             </div>
             <div>
-              <h3 className="font-semibold text-emerald-900 mb-1">Your response is confidential</h3>
-              <ul className="text-sm text-emerald-800 space-y-0.5">
-                <li>&bull; Your answers are never linked to your name, email, or user ID</li>
-                <li>&bull; Submission times are rounded to the nearest hour</li>
-                <li>&bull; Results are only shown when enough people respond to protect identity</li>
-                <li>&bull; Your manager sees team trends, never individual answers</li>
-              </ul>
+              <h3 className="font-semibold text-emerald-900 mb-1">Your feedback is anonymous</h3>
+              <p className="text-sm text-emerald-800">
+                Google sign-in confirms you are an active Clutch employee and helps us make sure each person responds once.
+                Your answers are stored separately from your login and are never shown with your name, email, Google ID, or employee ID.
+                Results are reported only when at least 3 people have responded, so managers and admins see trends, percentages, charts, and anonymous comments without identifying individual employees.
+              </p>
             </div>
           </div>
         </div>

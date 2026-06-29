@@ -2,10 +2,11 @@ import { NextRequest } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getScopedResponseWhere } from "@/lib/access";
 
 // Export survey results as CSV (anonymized)
 export async function GET(
-  _req: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ surveyId: string }> }
 ) {
   const session = await getServerSession(authOptions);
@@ -14,34 +15,47 @@ export async function GET(
   }
 
   const { surveyId } = await params;
+  const responseWhere = await getScopedResponseWhere(session.user, surveyId, {
+    departmentId: request.nextUrl.searchParams.get("departmentId"),
+    teamId: request.nextUrl.searchParams.get("teamId"),
+    location: request.nextUrl.searchParams.get("location"),
+  });
+
   const survey = await prisma.survey.findUnique({
     where: { id: surveyId },
     include: {
       questions: { orderBy: { order: "asc" } },
-      responses: {
-        include: {
-          answers: true,
-          department: { select: { name: true } },
-        },
-      },
     },
   });
 
   if (!survey) return Response.json({ error: "Not found" }, { status: 404 });
 
+  const responses = await prisma.surveyResponse.findMany({
+    where: responseWhere,
+    include: {
+      answers: true,
+      department: { select: { name: true } },
+      team: { select: { name: true } },
+    },
+  });
+
   // Build CSV header
   const headers = [
     "Response #",
     "Department",
+    "Team",
+    "Location",
     "Submitted Hour",
     ...survey.questions.map((q) => q.text),
   ];
 
   // Build rows (anonymized - no userId, no precise time)
-  const rows = survey.responses.map((resp, idx) => {
+  const rows = responses.map((resp, idx) => {
     const vals: string[] = [
       String(idx + 1),
       resp.department?.name || "Anonymous",
+      resp.team?.name || "",
+      resp.location || "",
       new Date(resp.submittedAt).toISOString().replace(/:\d{2}\.\d{3}Z/, ":00"),
     ];
 

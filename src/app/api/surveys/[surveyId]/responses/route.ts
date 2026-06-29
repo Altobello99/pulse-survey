@@ -3,12 +3,22 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
+type SubmittedAnswer = {
+  questionId: string;
+  ratingValue?: number | null;
+  choiceValue?: string | null;
+  textValue?: string | null;
+};
+
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ surveyId: string }> }
 ) {
   const session = await getServerSession(authOptions);
   if (!session) return Response.json({ error: "Unauthorized" }, { status: 401 });
+  if (session.user.status !== "active") {
+    return Response.json({ error: "Only active employees can submit surveys" }, { status: 403 });
+  }
 
   const { surveyId } = await params;
 
@@ -22,12 +32,18 @@ export async function POST(
 
   // Check survey is active
   const survey = await prisma.survey.findUnique({ where: { id: surveyId } });
-  if (!survey || survey.status !== "active") {
+  const now = new Date();
+  if (
+    !survey ||
+    survey.status !== "active" ||
+    survey.startDate > now ||
+    survey.endDate < now
+  ) {
     return Response.json({ error: "Survey not available" }, { status: 400 });
   }
 
   const body = await request.json();
-  const { answers } = body;
+  const { answers } = body as { answers?: SubmittedAnswer[] };
 
   // CONFIDENTIALITY: Round submittedAt to nearest hour so it cannot be
   // correlated with login timestamps or auth logs to identify respondents.
@@ -48,9 +64,12 @@ export async function POST(
         surveyId,
         departmentId: session.user.departmentId,
         teamId: safeTeamId,
+        managerEmail: session.user.managerEmail,
+        location: session.user.location,
+        division: session.user.division,
         submittedAt: fuzzedTime,
         answers: {
-          create: (answers || []).map((a: any) => ({
+          create: (answers || []).map((a) => ({
             questionId: a.questionId,
             ratingValue: a.ratingValue ?? null,
             choiceValue: a.choiceValue ?? null,
@@ -73,7 +92,7 @@ export async function GET(
   { params }: { params: Promise<{ surveyId: string }> }
 ) {
   const session = await getServerSession(authOptions);
-  if (!session || session.user.role === "employee") {
+  if (!session || session.user.role !== "admin") {
     return Response.json({ error: "Forbidden" }, { status: 403 });
   }
 

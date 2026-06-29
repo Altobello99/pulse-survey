@@ -15,11 +15,14 @@ export async function GET() {
     orderBy: { createdAt: "desc" },
   });
 
-  // For employees, only show active surveys within date range
+  // Employees see active surveys and closed/completed survey states, but never results.
   if (session.user.role === "employee") {
     const now = new Date();
     const filtered = surveys.filter(
-      (s) => s.status === "active" && new Date(s.startDate) <= now && new Date(s.endDate) >= now
+      (s) =>
+        s.status === "active" ||
+        s.status === "closed" ||
+        new Date(s.endDate) < now
     );
 
     // Check which surveys user already completed

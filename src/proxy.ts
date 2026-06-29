@@ -6,12 +6,11 @@ export async function proxy(request: NextRequest) {
   const token = await getToken({ req: request });
   const { pathname } = request.nextUrl;
 
-  // Allow auth, public survey, and PWA asset routes without login
+  // Allow auth, BambooHR cron sync, login, and PWA asset routes without login.
   if (
     pathname.startsWith("/api/auth") ||
+    pathname === "/api/integrations/bamboohr/sync" ||
     pathname === "/login" ||
-    pathname.startsWith("/s/") ||
-    pathname.startsWith("/api/public/") ||
     pathname === "/manifest.json" ||
     pathname === "/sw.js" ||
     pathname.startsWith("/icon") ||
@@ -41,6 +40,10 @@ export async function proxy(request: NextRequest) {
     token.role !== "admin"
   ) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
+  }
+
+  if (pathname.startsWith("/feedback") && token.role === "employee") {
+    return NextResponse.redirect(new URL("/surveys", request.url));
   }
 
   return NextResponse.next();

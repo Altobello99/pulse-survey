@@ -12,7 +12,9 @@
     "db:seed": "prisma db seed",
     "db:studio": "prisma studio",
     "db:reset": "prisma db push --force-reset && prisma db seed",
-    "setup": "npm install && prisma db push && prisma db seed"
+    "setup": "npm install && prisma db push && prisma db seed",
+    "survey:clutch": "tsx scripts/create-clutch-survey.ts",
+    "admin:bootstrap": "tsx scripts/bootstrap-admin.ts"
   },
   "prisma": {
     "seed": "npx tsx prisma/seed.ts"

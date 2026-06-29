@@ -9,21 +9,36 @@ declare module "next-auth" {
       role: string;
       departmentId: string;
       teamId: string | null;
+      managerEmail: string | null;
+      status: string;
+      location: string | null;
+      division: string | null;
+      loginId: string | null;
     };
   }
 
   interface User {
-    role: string;
-    departmentId: string;
-    teamId: string | null;
+    role?: string;
+    departmentId?: string;
+    teamId?: string | null;
+    managerEmail?: string | null;
+    status?: string;
+    location?: string | null;
+    division?: string | null;
+    loginId?: string | null;
   }
 }
 
 declare module "next-auth/jwt" {
   interface JWT {
-    id: string;
-    role: string;
-    departmentId: string;
-    teamId: string | null;
+    id?: string;
+    role?: string;
+    departmentId?: string;
+    teamId?: string | null;
+    managerEmail?: string | null;
+    status?: string;
+    location?: string | null;
+    division?: string | null;
+    loginId?: string | null;
   }
 }

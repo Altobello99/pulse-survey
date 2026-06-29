@@ -7,9 +7,8 @@ export const COLORS = {
   chartPalette: ["#0d9488", "#2563eb", "#8b5cf6", "#ec4899", "#f97316"],
 };
 
-// Minimum responses required before team-level results are shown.
-// At 1000+ employees, 5 is safe; raise to 10 if teams are large.
-export const ANONYMITY_THRESHOLD = 5;
+// Minimum responses required before any segmented results are shown.
+export const ANONYMITY_THRESHOLD = 3;
 
 // Minimum department-level responses before sentiment/themes are shown per department.
 export const DEPT_ANONYMITY_THRESHOLD = 3;

@@ -1,6 +1,8 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getScopedResponseWhere } from "@/lib/access";
+import { ANONYMITY_THRESHOLD } from "@/lib/constants";
 
 export async function GET() {
   const session = await getServerSession(authOptions);
@@ -13,13 +15,21 @@ export async function GET() {
     include: { survey: { select: { title: true, startDate: true } } },
   });
 
-  const data = analyses.map((a) => ({
-    surveyTitle: a.survey.title,
-    date: a.survey.startDate,
-    sentiment: a.sentiment,
-    score: a.score,
-    themes: JSON.parse(a.themes),
-  }));
+  const data = [];
+  for (const analysis of analyses) {
+    const responseCount = await prisma.surveyResponse.count({
+      where: await getScopedResponseWhere(session.user, analysis.surveyId),
+    });
+    if (session.user.role !== "admin" && responseCount < ANONYMITY_THRESHOLD) continue;
+
+    data.push({
+      surveyTitle: analysis.survey.title,
+      date: analysis.survey.startDate,
+      sentiment: analysis.sentiment,
+      score: analysis.score,
+      themes: JSON.parse(analysis.themes),
+    });
+  }
 
   return Response.json({ data });
 }

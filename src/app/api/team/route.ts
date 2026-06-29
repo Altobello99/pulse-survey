@@ -1,6 +1,7 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getScopedEmployeeWhere } from "@/lib/access";
 
 export async function GET() {
   const session = await getServerSession(authOptions);
@@ -9,12 +10,14 @@ export async function GET() {
   }
 
   const members = await prisma.user.findMany({
-    where: { departmentId: session.user.departmentId },
+    where: await getScopedEmployeeWhere(session.user),
     select: {
       id: true,
       name: true,
       email: true,
       role: true,
+      jobTitle: true,
+      location: true,
       team: { select: { name: true } },
     },
     orderBy: { name: "asc" },
