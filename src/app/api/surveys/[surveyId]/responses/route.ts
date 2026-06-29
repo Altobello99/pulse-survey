@@ -16,6 +16,12 @@ export async function POST(
 ) {
   const session = await getServerSession(authOptions);
   if (!session) return Response.json({ error: "Unauthorized" }, { status: 401 });
+  if (session.user.loginId) {
+    return Response.json(
+      { error: "Sign in with Google to submit an employee survey response" },
+      { status: 403 }
+    );
+  }
   if (session.user.status !== "active") {
     return Response.json({ error: "Only active employees can submit surveys" }, { status: 403 });
   }

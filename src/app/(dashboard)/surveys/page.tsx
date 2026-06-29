@@ -20,6 +20,9 @@ export default function SurveysPage() {
   const { data: session } = useSession();
   const [surveys, setSurveys] = useState<Survey[]>([]);
   const [loading, setLoading] = useState(true);
+  const canViewResults =
+    session?.user.role === "admin" || session?.user.role === "manager";
+  const isAdminPortal = Boolean(session?.user.loginId);
 
   useEffect(() => {
     fetch("/api/surveys")
@@ -50,7 +53,7 @@ export default function SurveysPage() {
         </h1>
       </div>
 
-      {session?.user.role === "employee" && (
+      {!isAdminPortal && (
         <div className="mb-6 rounded-lg border border-emerald-200 bg-emerald-50 p-4 flex items-start gap-3">
           <svg className="w-5 h-5 text-emerald-700 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
@@ -70,78 +73,94 @@ export default function SurveysPage() {
         </div>
       ) : (
         <div className="grid gap-4">
-          {surveys.map((survey) => (
-            <Link
-              key={survey.id}
-              href={
-                survey.completed
-                  ? "#"
-                  : isClosed(survey) && session?.user.role === "employee"
-                  ? `/surveys/${survey.id}`
-                  : session?.user.role === "employee"
-                  ? `/surveys/${survey.id}`
-                  : `/surveys/${survey.id}/results`
-              }
-              className={`block bg-white rounded-xl border border-slate-200 p-6 hover:border-primary/30 hover:shadow-sm transition ${
-                survey.completed ? "opacity-60 pointer-events-none" : ""
-              }`}
-            >
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <h2 className="text-lg font-semibold text-slate-900">
-                      {survey.title}
-                    </h2>
-                    <span
-                      className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                        survey.status === "active"
-                          ? "bg-emerald-50 text-emerald-700"
-                          : survey.status === "closed"
-                          ? "bg-slate-100 text-slate-600"
-                          : "bg-amber-50 text-amber-700"
-                      }`}
-                    >
-                      {survey.status}
-                    </span>
+          {surveys.map((survey) => {
+            const closed = isClosed(survey);
+            const canTake = !survey.completed && !closed && !isAdminPortal;
+
+            return (
+              <div
+                key={survey.id}
+                className="bg-white rounded-xl border border-slate-200 p-6 transition hover:border-primary/30 hover:shadow-sm"
+              >
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <h2 className="text-lg font-semibold text-slate-900">
+                        {survey.title}
+                      </h2>
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                          survey.status === "active"
+                            ? "bg-emerald-50 text-emerald-700"
+                            : survey.status === "closed"
+                            ? "bg-slate-100 text-slate-600"
+                            : "bg-amber-50 text-amber-700"
+                        }`}
+                      >
+                        {survey.status}
+                      </span>
+                      {survey.completed && (
+                        <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700">
+                          Completed
+                        </span>
+                      )}
+                      {!survey.completed && closed && (
+                        <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600">
+                          Closed
+                        </span>
+                      )}
+                    </div>
+                    {survey.description && (
+                      <p className="text-sm text-slate-500 mb-2">
+                        {survey.description}
+                      </p>
+                    )}
+                    <p className="text-xs text-slate-400">
+                      {formatDate(survey.startDate)} - {formatDate(survey.endDate)} &middot;{" "}
+                      {survey._count.responses} responses
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 flex-wrap gap-2">
+                    {canTake && (
+                      <Link
+                        href={`/surveys/${survey.id}`}
+                        className="px-4 py-2 bg-primary text-white text-sm font-medium rounded-lg hover:bg-primary/90 transition"
+                      >
+                        Take Survey
+                      </Link>
+                    )}
+                    {!survey.completed && closed && (
+                      <Link
+                        href={`/surveys/${survey.id}`}
+                        className="px-4 py-2 bg-slate-100 text-slate-600 text-sm font-medium rounded-lg hover:bg-slate-200 transition"
+                      >
+                        View Status
+                      </Link>
+                    )}
                     {survey.completed && (
-                      <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700">
-                        Completed
+                      <span className="px-4 py-2 bg-blue-50 text-blue-700 text-sm font-medium rounded-lg">
+                        Submitted
                       </span>
                     )}
-                    {!survey.completed && isClosed(survey) && (
-                      <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600">
-                        Closed
-                      </span>
+                    {canViewResults && (
+                      <Link
+                        href={`/surveys/${survey.id}/results`}
+                        className="px-4 py-2 border border-slate-200 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 transition"
+                      >
+                        View Results
+                      </Link>
                     )}
                   </div>
-                  {survey.description && (
-                    <p className="text-sm text-slate-500 mb-2">
-                      {survey.description}
-                    </p>
-                  )}
-                  <p className="text-xs text-slate-400">
-                    {formatDate(survey.startDate)} - {formatDate(survey.endDate)} &middot;{" "}
-                    {survey._count.responses} responses
-                  </p>
                 </div>
-                {!survey.completed && !isClosed(survey) && session?.user.role === "employee" && (
-                  <span className="shrink-0 px-4 py-2 bg-primary text-white text-sm font-medium rounded-lg">
-                    Take Survey
-                  </span>
-                )}
-                {!survey.completed && isClosed(survey) && session?.user.role === "employee" && (
-                  <span className="shrink-0 px-4 py-2 bg-slate-100 text-slate-600 text-sm font-medium rounded-lg">
-                    View Status
-                  </span>
-                )}
               </div>
-            </Link>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
   );
 }
-  function isClosed(survey: Survey) {
-    return survey.status !== "active" || new Date(survey.endDate) < new Date();
-  }
+
+function isClosed(survey: Survey) {
+  return survey.status !== "active" || new Date(survey.endDate) < new Date();
+}

@@ -15,6 +15,12 @@ export async function GET() {
     orderBy: { createdAt: "desc" },
   });
 
+  const completions = await prisma.surveyCompletion.findMany({
+    where: { userId: session.user.id },
+    select: { surveyId: true },
+  });
+  const completedIds = new Set(completions.map((c) => c.surveyId));
+
   // Employees see active surveys and closed/completed survey states, but never results.
   if (session.user.role === "employee") {
     const now = new Date();
@@ -25,13 +31,6 @@ export async function GET() {
         new Date(s.endDate) < now
     );
 
-    // Check which surveys user already completed
-    const completions = await prisma.surveyCompletion.findMany({
-      where: { userId: session.user.id },
-      select: { surveyId: true },
-    });
-    const completedIds = new Set(completions.map((c) => c.surveyId));
-
     return Response.json({
       data: filtered.map((s) => ({
         ...s,
@@ -40,7 +39,12 @@ export async function GET() {
     });
   }
 
-  return Response.json({ data: surveys });
+  return Response.json({
+    data: surveys.map((s) => ({
+      ...s,
+      completed: completedIds.has(s.id),
+    })),
+  });
 }
 
 export async function POST(request: NextRequest) {

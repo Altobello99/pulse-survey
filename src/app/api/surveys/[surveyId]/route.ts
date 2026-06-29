@@ -22,14 +22,10 @@ export async function GET(
 
   if (!survey) return Response.json({ error: "Not found" }, { status: 404 });
 
-  // Check if employee already completed
-  let completed = false;
-  if (session.user.role === "employee" || session.user.role === "manager") {
-    const completion = await prisma.surveyCompletion.findUnique({
-      where: { userId_surveyId: { userId: session.user.id, surveyId } },
-    });
-    completed = !!completion;
-  }
+  const completion = await prisma.surveyCompletion.findUnique({
+    where: { userId_surveyId: { userId: session.user.id, surveyId } },
+  });
+  const completed = !!completion;
 
   return Response.json({ data: { ...survey, completed } });
 }

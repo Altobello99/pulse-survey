@@ -31,6 +31,7 @@ export default function TakeSurveyPage({ params }: { params: Promise<{ surveyId:
   const [answers, setAnswers] = useState<Record<string, AnswerValue>>({});
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -47,6 +48,7 @@ export default function TakeSurveyPage({ params }: { params: Promise<{ surveyId:
     e.preventDefault();
     if (!survey) return;
     setSubmitting(true);
+    setSubmitError(null);
 
     const answerData = survey.questions.map((q) => {
       const val = answers[q.id];
@@ -66,6 +68,9 @@ export default function TakeSurveyPage({ params }: { params: Promise<{ surveyId:
 
     if (res.ok) {
       setSubmitted(true);
+    } else {
+      const data = await res.json().catch(() => null);
+      setSubmitError(data?.error || "Your response could not be submitted.");
     }
     setSubmitting(false);
   }
@@ -240,6 +245,11 @@ export default function TakeSurveyPage({ params }: { params: Promise<{ surveyId:
           ))}
 
           <div className="pt-4 border-t border-slate-200">
+            {submitError && (
+              <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                {submitError}
+              </div>
+            )}
             <button
               type="submit"
               disabled={submitting}
