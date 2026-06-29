@@ -155,31 +155,6 @@ export default function LoginPage() {
           >
             {loading ? "Signing in..." : "Sign in"}
           </button>
-
-          <div className="border-t border-slate-200 pt-4">
-            <p className="text-xs text-slate-500 text-center mb-3">
-              Local Credentials
-            </p>
-            <div className="grid grid-cols-3 gap-2 text-xs">
-              {[
-                { label: "Admin", userId: "admin", password: "admin123" },
-                { label: "Manager", userId: "eng.manager@pulsesurvey.com", password: "manager123" },
-                { label: "Employee", userId: "alice@pulsesurvey.com", password: "employee123" },
-              ].map((demo) => (
-                <button
-                  key={demo.userId}
-                  type="button"
-                  onClick={() => {
-                    setUserId(demo.userId);
-                    setPassword(demo.password);
-                  }}
-                  className="py-2 px-2 border border-slate-200 rounded-lg hover:bg-slate-50 text-slate-600 transition"
-                >
-                  {demo.label}
-                </button>
-              ))}
-            </div>
-          </div>
         </form>
       </div>
     </div>

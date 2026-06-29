@@ -4,7 +4,6 @@ import { prisma } from "@/lib/prisma";
 import { isAdminEmail, normalizeEmail } from "@/lib/access";
 
 const DEFAULT_COMPANY_DOMAIN = "clutchtechnologiesinc";
-const DEFAULT_ADMIN_PASSWORD = "admin123";
 
 type BambooEmployee = {
   employeeId?: string;
@@ -82,7 +81,7 @@ export async function syncBambooEmployees(): Promise<BambooSyncResult> {
   let managerCount = 0;
   const now = new Date();
   const nonAdminHash = await bcrypt.hash(randomUUID(), 10);
-  const adminHash = await bcrypt.hash(process.env.ADMIN_BOOTSTRAP_PASSWORD || DEFAULT_ADMIN_PASSWORD, 10);
+  const adminHash = await bcrypt.hash(process.env.ADMIN_BOOTSTRAP_PASSWORD || randomUUID(), 10);
 
   for (const employee of normalized) {
     const department = await prisma.department.upsert({

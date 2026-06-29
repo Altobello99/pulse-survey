@@ -9,10 +9,14 @@ const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
-const adminPassword = process.env.ADMIN_BOOTSTRAP_PASSWORD || "admin123";
+const adminPassword = process.env.ADMIN_BOOTSTRAP_PASSWORD || "";
 const adminName = process.env.ADMIN_BOOTSTRAP_NAME || "Admin";
 
 async function main() {
+  if (!adminPassword && !process.env.ADMIN_PORTAL_ACCOUNTS) {
+    throw new Error("Set ADMIN_BOOTSTRAP_PASSWORD or ADMIN_PORTAL_ACCOUNTS before bootstrapping admin logins.");
+  }
+
   const department = await prisma.department.upsert({
     where: { name: "Administration" },
     create: { name: "Administration" },
@@ -33,6 +37,10 @@ async function main() {
   const accounts = getAdminPortalAccounts(adminPassword);
 
   for (const account of accounts) {
+    if (!account.password) {
+      throw new Error(`Missing password for admin login ID: ${account.loginId}`);
+    }
+
     const passwordHash = await bcrypt.hash(account.password, 10);
     const adminEmail = getAdminPortalEmail(account.loginId);
 

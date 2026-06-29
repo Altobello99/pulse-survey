@@ -11,11 +11,8 @@ npm run dev
 
 Open http://localhost:3000.
 
-```text
-admin                         admin123
-eng.manager@pulsesurvey.com manager123
-alice@pulsesurvey.com      employee123
-```
+Use Google sign-in for employees. The generic admin portal uses the configured
+`ADMIN_PORTAL_ACCOUNTS` or `ADMIN_BOOTSTRAP_PASSWORD` value.
 
 ## Google Sign-In
 
@@ -30,7 +27,7 @@ BAMBOOHR_API_KEY="..."
 ADMIN_EMAILS="michael-anthony.altobello@clutch.ca"
 ADMIN_LOGIN_IDS="admin,hr-admin"
 ADMIN_BOOTSTRAP_PASSWORD="..."
-ADMIN_PORTAL_ACCOUNTS="admin:admin123,hr-admin:change-this-password"
+ADMIN_PORTAL_ACCOUNTS="admin:use-a-strong-password,hr-admin:use-a-different-strong-password"
 CRON_SECRET="..."
 ```
 
