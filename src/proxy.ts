@@ -22,7 +22,13 @@ export async function proxy(request: NextRequest) {
     if (token && pathname === "/login") {
       return NextResponse.redirect(new URL("/dashboard", request.url));
     }
-    return NextResponse.next();
+    const response = NextResponse.next();
+    if (pathname === "/login" || pathname === "/reset-cache") {
+      response.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+      response.headers.set("Pragma", "no-cache");
+      response.headers.set("Expires", "0");
+    }
+    return response;
   }
 
   // Redirect unauthenticated users to login
