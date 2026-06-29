@@ -7,7 +7,8 @@ const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
-const surveyTitle = "Clutch Employee Pulse";
+const surveyTitle = "Employee Pulse Survey";
+const previousSurveyTitles = ["Clutch Employee Pulse"];
 
 const groupedQuestions = [
   {
@@ -62,13 +63,13 @@ const groupedQuestions = [
 
 async function main() {
   const survey = await prisma.survey.findFirst({
-    where: { title: surveyTitle },
+    where: { title: { in: [surveyTitle, ...previousSurveyTitles] } },
     orderBy: { createdAt: "desc" },
     include: { questions: { orderBy: { order: "asc" } } },
   });
 
   if (!survey) {
-    throw new Error(`Survey not found: ${surveyTitle}`);
+    throw new Error(`Survey not found: ${[surveyTitle, ...previousSurveyTitles].join(", ")}`);
   }
 
   if (survey.questions.length !== groupedQuestions.length) {
@@ -89,7 +90,14 @@ async function main() {
     });
   }
 
-  console.log(`Updated ${groupedQuestions.length} question sections for ${survey.title}.`);
+  if (survey.title !== surveyTitle) {
+    await prisma.survey.update({
+      where: { id: survey.id },
+      data: { title: surveyTitle },
+    });
+  }
+
+  console.log(`Updated ${groupedQuestions.length} question sections for ${surveyTitle}.`);
 }
 
 main()

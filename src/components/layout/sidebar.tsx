@@ -49,9 +49,9 @@ export default function Sidebar({ open, onClose }: { open: boolean; onClose: () 
       >
         <div className="p-5 border-b border-white/10">
           <div className="flex items-center gap-3">
-            <img src="/logo.svg" alt="PulseSurvey" className="w-9 h-9 rounded-lg" />
+            <img src="/logo.svg" alt="Employee Pulse Survey" className="w-9 h-9 rounded-lg" />
             <div>
-              <h1 className="font-bold text-lg leading-tight">PulseSurvey</h1>
+              <h1 className="font-bold text-base leading-tight">Employee Pulse Survey</h1>
               <p className="text-xs text-slate-400 capitalize">{role} Portal</p>
             </div>
           </div>

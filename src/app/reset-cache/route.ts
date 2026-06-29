@@ -4,7 +4,7 @@ export async function GET() {
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Refreshing PulseSurvey</title>
+    <title>Refreshing Employee Pulse Survey</title>
     <style>
       body {
         align-items: center;
@@ -29,12 +29,12 @@ export async function GET() {
   </head>
   <body>
     <main>
-      <h1>Refreshing PulseSurvey</h1>
+      <h1>Refreshing Employee Pulse Survey</h1>
       <p>Clearing the old cached version and opening the current login page.</p>
-      <p><a href="/login?fresh=1">Continue to PulseSurvey</a></p>
+      <p><a href="/login?fresh=1">Continue to Employee Pulse Survey</a></p>
     </main>
     <script>
-      async function resetPulseSurvey() {
+      async function resetEmployeePulseSurvey() {
         try {
           if ("serviceWorker" in navigator) {
             const registrations = await navigator.serviceWorker.getRegistrations();
@@ -53,7 +53,7 @@ export async function GET() {
         }
         window.location.replace("/login?fresh=" + Date.now());
       }
-      resetPulseSurvey();
+      resetEmployeePulseSurvey();
     </script>
   </body>
 </html>`;

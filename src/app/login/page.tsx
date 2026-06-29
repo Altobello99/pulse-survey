@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 
 const authErrorMessages: Record<string, string> = {
   AccessDenied:
-    "Use your approved Clutch Google account. If you should have access, ask an admin to add your email to PulseSurvey.",
+    "Use your approved company Google account. If you should have access, ask an admin to add your email.",
   OAuthSignin: "Google sign-in could not start. Please try again.",
   OAuthCallback: "Google sign-in could not be completed. Please try again.",
 };
@@ -63,10 +63,10 @@ export default function LoginPage() {
     <div className="min-h-full flex items-center justify-center bg-gradient-to-br from-teal-50 to-blue-50 px-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <img src="/logo.svg" alt="PulseSurvey" className="inline-block w-16 h-16 mb-4" />
-          <h1 className="text-3xl font-bold text-slate-900">PulseSurvey</h1>
+          <img src="/logo.svg" alt="Employee Pulse Survey" className="inline-block w-16 h-16 mb-4" />
+          <h1 className="text-3xl font-bold text-slate-900">Employee Pulse Survey</h1>
           <p className="text-slate-500 mt-2">
-            Clutch Employee Pulse Survey
+            Anonymous employee feedback
           </p>
         </div>
 

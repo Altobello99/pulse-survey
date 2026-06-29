@@ -14,8 +14,8 @@ type QuestionInput = {
   required?: boolean;
 };
 
-const surveyTitle = "Clutch Employee Pulse";
-const previousSurveyTitles = [surveyTitle, "Safety & Leadership Behaviours Pulse"];
+const surveyTitle = "Employee Pulse Survey";
+const previousSurveyTitles = [surveyTitle, "Clutch Employee Pulse", "Safety & Leadership Behaviours Pulse"];
 
 const questions: QuestionInput[] = [
   {

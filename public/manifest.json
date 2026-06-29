@@ -1,7 +1,7 @@
 {
-  "name": "PulseSurvey - Employee Engagement",
-  "short_name": "PulseSurvey",
-  "description": "Continuous employee engagement and pulse survey tool",
+  "name": "Employee Pulse Survey",
+  "short_name": "Employee Pulse Survey",
+  "description": "Anonymous employee pulse survey",
   "start_url": "/dashboard",
   "display": "standalone",
   "orientation": "portrait",

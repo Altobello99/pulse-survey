@@ -1,6 +1,6 @@
 // Service worker cleanup.
 // The app previously cached /login and / with a cache-first strategy, which can
-// leave employees on an old sign-in screen. PulseSurvey is an online app, so we
+// leave employees on an old sign-in screen. Employee Pulse Survey is an online app, so we
 // unregister the service worker and clear old app-shell caches.
 
 self.addEventListener("install", (event) => {

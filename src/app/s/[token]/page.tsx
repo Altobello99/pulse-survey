@@ -127,8 +127,8 @@ export default function PublicSurveyPage({
     <div className="min-h-screen bg-gradient-to-br from-teal-50 to-blue-50 p-4 py-8">
       <div className="max-w-2xl mx-auto">
         <div className="text-center mb-6">
-          <img src="/logo.svg" alt="PulseSurvey" className="inline-block w-12 h-12 mb-2" />
-          <p className="text-sm text-slate-500">PulseSurvey</p>
+          <img src="/logo.svg" alt="Employee Pulse Survey" className="inline-block w-12 h-12 mb-2" />
+          <p className="text-sm text-slate-500">Employee Pulse Survey</p>
         </div>
 
         <div className="bg-white rounded-xl border border-slate-200 p-8">

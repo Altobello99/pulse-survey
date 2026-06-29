@@ -4,12 +4,12 @@ import Providers from "./providers";
 import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
 
 export const metadata: Metadata = {
-  title: "Clutch PulseSurvey",
-  description: "Anonymous employee pulse surveys for Clutch",
+  title: "Employee Pulse Survey",
+  description: "Anonymous employee pulse surveys",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
-    title: "PulseSurvey",
+    title: "Employee Pulse Survey",
     statusBarStyle: "default",
   },
   icons: {

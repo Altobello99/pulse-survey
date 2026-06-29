@@ -28,7 +28,7 @@ export async function sendTeamsNotification(message: string) {
         "@type": "MessageCard",
         "@context": "http://schema.org/extensions",
         themeColor: "0d9488",
-        title: "PulseSurvey",
+        title: "Employee Pulse Survey",
         text: message,
       }),
     });

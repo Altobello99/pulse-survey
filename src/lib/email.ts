@@ -11,7 +11,7 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-const FROM = process.env.SMTP_FROM || "PulseSurvey <noreply@pulsesurvey.com>";
+const FROM = process.env.SMTP_FROM || "Employee Pulse Survey <noreply@pulsesurvey.com>";
 
 export async function sendEmail(
   to: string,
@@ -52,7 +52,7 @@ export function surveyReminderHtml(surveyTitle: string, surveyUrl: string) {
   return `
     <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 24px;">
       <div style="text-align: center; margin-bottom: 24px;">
-        <h2 style="color: #0d9488;">PulseSurvey</h2>
+        <h2 style="color: #0d9488;">Employee Pulse Survey</h2>
       </div>
       <p>Hi there,</p>
       <p>You have a pending survey: <strong>${surveyTitle}</strong></p>
@@ -69,7 +69,7 @@ export function managerInsightHtml(managerName: string, surveyTitle: string, das
   return `
     <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 24px;">
       <div style="text-align: center; margin-bottom: 24px;">
-        <h2 style="color: #0d9488;">PulseSurvey</h2>
+        <h2 style="color: #0d9488;">Employee Pulse Survey</h2>
       </div>
       <p>Hi ${managerName},</p>
       <p>New insights are available for <strong>${surveyTitle}</strong>.</p>

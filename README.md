@@ -1,4 +1,4 @@
-# PulseSurvey
+# Employee Pulse Survey
 
 Employee pulse survey app for Clutch.
 
