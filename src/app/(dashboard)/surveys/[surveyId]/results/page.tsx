@@ -79,6 +79,54 @@ const SENTIMENT_COLORS = {
   mixed: "#8b5cf6",
 };
 
+const REPORT_DOWNLOADS = [
+  {
+    type: "executive-summary",
+    label: "Executive Summary",
+    description: "Cover sheet, top metrics, participation, sentiment, and chart data.",
+  },
+  {
+    type: "participation",
+    label: "Participation Report",
+    description: "Completion and response rates by company, department, team, and location.",
+  },
+  {
+    type: "question-results",
+    label: "Question-by-Question Results",
+    description: "Ratings, distributions, choices, and response totals for each question.",
+  },
+  {
+    type: "department-breakdown",
+    label: "Department Breakdown",
+    description: "Department-level results with anonymity suppression under 3 responses.",
+  },
+  {
+    type: "team-location-breakdown",
+    label: "Team and Location Breakdown",
+    description: "Team and location reports with chart-ready tables and suppression rules.",
+  },
+  {
+    type: "manager-scoped",
+    label: "Manager-Scoped Report",
+    description: "Manager-level participation and outcomes where manager mapping exists.",
+  },
+  {
+    type: "comments-themes",
+    label: "Anonymous Comments and Themes",
+    description: "Admin-only raw comments plus grouped AI themes when analysis is available.",
+  },
+  {
+    type: "completion-tracker",
+    label: "Completion Tracker",
+    description: "Employee-level completion status plus completion counts by group.",
+  },
+  {
+    type: "non-completion",
+    label: "Non-Completion List",
+    description: "Employees who have not completed the survey for reminder follow-up.",
+  },
+];
+
 export default function SurveyResultsPage({
   params,
 }: {
@@ -137,12 +185,18 @@ export default function SurveyResultsPage({
   const sentiment = result.sentiment;
   const themes: string[] = sentiment ? JSON.parse(sentiment.themes) : [];
   const insights: string[] = sentiment ? JSON.parse(sentiment.insights) : [];
-  const exportParams = new URLSearchParams();
-  if (departmentId) exportParams.set("departmentId", departmentId);
-  if (teamId) exportParams.set("teamId", teamId);
-  if (location) exportParams.set("location", location);
-  const exportHref = `/api/surveys/${surveyId}/export${exportParams.toString() ? `?${exportParams}` : ""}`;
   const groupedQuestionResults = groupQuestionResults(result.questionResults);
+  const hasActiveFilters = Boolean(departmentId || teamId || location);
+
+  function reportHref(reportType: string, format: "xlsx" | "csv", scope: "filtered" | "company") {
+    const params = new URLSearchParams({ format, scope });
+    if (scope === "filtered") {
+      if (departmentId) params.set("departmentId", departmentId);
+      if (teamId) params.set("teamId", teamId);
+      if (location) params.set("location", location);
+    }
+    return `/api/surveys/${surveyId}/reports/${reportType}?${params.toString()}`;
+  }
 
   return (
     <div className="space-y-6">
@@ -160,12 +214,6 @@ export default function SurveyResultsPage({
             >
               {analyzing ? "Analyzing..." : "Run AI Analysis"}
             </button>
-            <a
-              href={exportHref}
-              className="px-4 py-2 border border-slate-300 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 transition"
-            >
-              Export CSV
-            </a>
             <button
               onClick={async () => {
                 const r = await fetch(`/api/surveys/${surveyId}/reminders`, { method: "POST" });
@@ -224,6 +272,59 @@ export default function SurveyResultsPage({
             >
               Clear filters
             </button>
+          </div>
+        </div>
+      )}
+
+      {session?.user.role === "admin" && (
+        <div className="bg-white rounded-xl border border-slate-200 p-5">
+          <div className="mb-4">
+            <h2 className="text-lg font-semibold text-slate-900">Report Downloads</h2>
+            <p className="text-sm text-slate-500">
+              XLSX files include summary tabs, clean tables, and chart-ready sheets. CSV files include the same report sections as labeled blocks.
+            </p>
+          </div>
+          <div className="divide-y divide-slate-100">
+            {REPORT_DOWNLOADS.map((report) => (
+              <div key={report.type} className="py-4 first:pt-0 last:pb-0">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                  <div className="min-w-0">
+                    <h3 className="font-medium text-slate-900">{report.label}</h3>
+                    <p className="text-sm text-slate-500">{report.description}</p>
+                  </div>
+                  <div className="flex shrink-0 flex-wrap gap-2">
+                    <a
+                      href={reportHref(report.type, "xlsx", "filtered")}
+                      className="px-3 py-2 bg-primary text-white text-xs font-medium rounded-lg hover:bg-primary/90 transition"
+                    >
+                      XLSX
+                    </a>
+                    <a
+                      href={reportHref(report.type, "csv", "filtered")}
+                      className="px-3 py-2 border border-slate-300 text-slate-700 text-xs font-medium rounded-lg hover:bg-slate-50 transition"
+                    >
+                      CSV
+                    </a>
+                    {hasActiveFilters && (
+                      <>
+                        <a
+                          href={reportHref(report.type, "xlsx", "company")}
+                          className="px-3 py-2 bg-slate-900 text-white text-xs font-medium rounded-lg hover:bg-slate-700 transition"
+                        >
+                          Company XLSX
+                        </a>
+                        <a
+                          href={reportHref(report.type, "csv", "company")}
+                          className="px-3 py-2 border border-slate-300 text-slate-700 text-xs font-medium rounded-lg hover:bg-slate-50 transition"
+                        >
+                          Company CSV
+                        </a>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}
