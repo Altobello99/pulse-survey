@@ -62,7 +62,8 @@ export default function Sidebar({ open, onClose }: { open: boolean; onClose: () 
           {items.map((item) => {
             const active =
               pathname === item.href ||
-              (item.href !== "/surveys" &&
+              (item.href !== "/admin" &&
+                item.href !== "/surveys" &&
                 item.href !== "/feedback" &&
                 pathname.startsWith(item.href + "/"));
             return (
