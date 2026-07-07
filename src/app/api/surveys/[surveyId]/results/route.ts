@@ -91,7 +91,7 @@ export async function GET(
       const avg = ratings.length
         ? ratings.reduce((sum, value) => sum + value, 0) / ratings.length
         : 0;
-      const distribution = [1, 2, 3, 4, 5].map((rating) => ({
+      const distribution = ratingOptions(question).map((rating) => ({
         rating,
         count: ratings.filter((value) => value === rating).length,
       }));
@@ -158,6 +158,20 @@ export async function GET(
       suppressed: false,
     },
   });
+}
+
+function ratingOptions(question: { options: string | null }) {
+  if (!question.options) return [1, 2, 3, 4, 5];
+  try {
+    const parsed = JSON.parse(question.options);
+    if (!Array.isArray(parsed)) return [1, 2, 3, 4, 5];
+    const values = parsed
+      .map((option) => Number(option))
+      .filter((option) => Number.isInteger(option));
+    return values.length ? values : [1, 2, 3, 4, 5];
+  } catch {
+    return [1, 2, 3, 4, 5];
+  }
 }
 
 function getFilters(request: NextRequest): AccessFilters {

@@ -16,7 +16,6 @@ type QuestionInput = {
 };
 
 const surveyTitle = "Employee Pulse Survey";
-const previousSurveyTitles = [surveyTitle, "Clutch Employee Pulse", "Safety & Leadership Behaviours Pulse"];
 
 const questions: QuestionInput[] = [
   {
@@ -89,69 +88,46 @@ const questions: QuestionInput[] = [
   },
 ];
 
-async function removeSurvey(title: string) {
-  const survey = await prisma.survey.findFirst({ where: { title } });
-  if (!survey) return false;
-
-  await prisma.answer.deleteMany({ where: { surveyResponse: { surveyId: survey.id } } });
-  await prisma.surveyResponse.deleteMany({ where: { surveyId: survey.id } });
-  await prisma.surveyCompletion.deleteMany({ where: { surveyId: survey.id } });
-  await prisma.sentimentAnalysis.deleteMany({ where: { surveyId: survey.id } });
-  await prisma.anonymousToken.deleteMany({ where: { surveyId: survey.id } });
-  await prisma.question.deleteMany({ where: { surveyId: survey.id } });
-  await prisma.survey.delete({ where: { id: survey.id } });
-
-  return true;
-}
-
 async function main() {
-  const admin =
-    (await prisma.user.findUnique({ where: { email: "admin@pulsesurvey.com" } })) ||
-    (await prisma.user.findFirst({ where: { role: "admin" }, orderBy: { createdAt: "asc" } }));
-
-  if (!admin) throw new Error("Admin user not found. Seed or import an admin first.");
-
-  const startDate = new Date();
-  startDate.setHours(0, 0, 0, 0);
-
-  const endDate = new Date(startDate);
-  endDate.setDate(endDate.getDate() + 14);
-  endDate.setHours(23, 59, 59, 999);
-
-  for (const title of previousSurveyTitles) {
-    const removed = await removeSurvey(title);
-    if (removed) console.log(`Removed existing survey: ${title}`);
-  }
-
-  const survey = await prisma.survey.create({
-    data: {
-      title: surveyTitle,
-      description:
-        "A short anonymous pulse survey for Clutch employees. Google sign-in is used only to confirm access and prevent duplicate submissions; responses are stored without name, email, Google ID, or user ID.",
-      status: "active",
-      frequency: "monthly",
-      startDate,
-      endDate,
-      createdById: admin.id,
-      questions: {
-        create: questions.map((question, order) => ({
-          section: question.section,
-          text: question.text,
-          type: question.type,
-          required: question.required ?? true,
-          order,
-          options: question.options ? JSON.stringify(question.options) : null,
-        })),
-      },
-    },
-    include: { _count: { select: { questions: true } } },
+  const survey = await prisma.survey.findFirst({
+    where: { title: surveyTitle, status: "active" },
+    orderBy: { createdAt: "desc" },
+    include: { questions: { orderBy: { order: "asc" } } },
   });
 
-  console.log("Survey created successfully!");
-  console.log(`Title: ${survey.title}`);
-  console.log(`Status: ${survey.status}`);
-  console.log(`Questions: ${survey._count.questions}`);
-  console.log(`Dates: ${survey.startDate.toISOString()} to ${survey.endDate.toISOString()}`);
+  if (!survey) throw new Error(`Active survey not found: ${surveyTitle}`);
+
+  const desiredByText = new Map(questions.map((question) => [question.text, question]));
+
+  for (const existing of survey.questions) {
+    if (desiredByText.has(existing.text)) continue;
+    if (existing.text.toLowerCase().includes("workload")) {
+      await prisma.answer.deleteMany({ where: { questionId: existing.id } });
+      await prisma.question.delete({ where: { id: existing.id } });
+      console.log(`Removed question: ${existing.text}`);
+    }
+  }
+
+  for (const [order, question] of questions.entries()) {
+    const existing = survey.questions.find((item) => item.text === question.text);
+    const data = {
+      section: question.section,
+      text: question.text,
+      type: question.type,
+      required: question.required ?? true,
+      order,
+      options: question.options ? JSON.stringify(question.options) : null,
+    };
+
+    if (existing) {
+      await prisma.question.update({ where: { id: existing.id }, data });
+    } else {
+      await prisma.question.create({ data: { ...data, surveyId: survey.id } });
+      console.log(`Added question: ${question.text}`);
+    }
+  }
+
+  console.log(`Updated ${questions.length} questions for ${surveyTitle}.`);
 }
 
 main()

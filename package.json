@@ -15,6 +15,7 @@
     "setup": "npm install && prisma db push && prisma db seed",
     "survey:clutch": "tsx scripts/create-clutch-survey.ts",
     "survey:clutch-sections": "tsx scripts/update-clutch-question-sections.ts",
+    "survey:update-current": "tsx scripts/update-current-survey-questions.ts",
     "admin:bootstrap": "tsx scripts/bootstrap-admin.ts"
   },
   "prisma": {

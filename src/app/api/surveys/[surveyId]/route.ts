@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getEligibleSurveyDemographics } from "@/lib/demographic-options";
 
 export async function GET(
   _req: NextRequest,
@@ -26,8 +27,29 @@ export async function GET(
     where: { userId_surveyId: { userId: session.user.id, surveyId } },
   });
   const completed = !!completion;
+  const demographicOptions = await getEligibleSurveyDemographics();
+  const currentDepartmentId = demographicOptions.departments.some(
+    (department) => department.id === session.user.departmentId
+  )
+    ? session.user.departmentId
+    : null;
+  const currentLocation = demographicOptions.locations.some(
+    (location) => location.name === session.user.location
+  )
+    ? session.user.location
+    : null;
 
-  return Response.json({ data: { ...survey, completed } });
+  return Response.json({
+    data: {
+      ...survey,
+      completed,
+      demographicOptions: {
+        ...demographicOptions,
+        currentDepartmentId,
+        currentLocation,
+      },
+    },
+  });
 }
 
 export async function PUT(

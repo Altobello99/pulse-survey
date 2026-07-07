@@ -36,10 +36,6 @@ const groupedQuestions = [
     text: "Are your tools, technology, and systems easy to use and supportive of productivity?",
   },
   {
-    section: "Workload",
-    text: "Do you have a manageable and sustainable workload?",
-  },
-  {
     section: "Learning",
     text: "Do you have access to adequate learning resources and tools to perform your job effectively?",
   },
@@ -54,6 +50,14 @@ const groupedQuestions = [
   {
     section: "Senior Leadership Visibility",
     text: "Are you satisfied with the frequency and transparency of communication from senior leadership?",
+  },
+  {
+    section: "Belonging & Advocacy",
+    text: "Do you have a best friend at work?",
+  },
+  {
+    section: "Belonging & Advocacy",
+    text: "On a scale of 0 to 10, how likely are you to recommend our company as a place to work?",
   },
   {
     section: "Ending Questions",

@@ -13,6 +13,10 @@ export const ANONYMITY_THRESHOLD = 3;
 // Minimum department-level responses before sentiment/themes are shown per department.
 export const DEPT_ANONYMITY_THRESHOLD = 3;
 
+// Departments and locations must have at least this many active employees before
+// employees can self-select them on a survey response.
+export const DEMOGRAPHIC_OPTION_EMPLOYEE_THRESHOLD = 10;
+
 export const SURVEY_STATUSES = ["draft", "active", "closed"] as const;
 export const QUESTION_TYPES = ["rating", "multiple_choice", "free_text"] as const;
 export const ROLES = ["admin", "manager", "employee"] as const;

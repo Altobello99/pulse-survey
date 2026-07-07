@@ -239,12 +239,7 @@ function buildQuestionResultsReport(context: ReportContext): ReportSheet[] {
       "Type",
       "Responses",
       "Average",
-      "Rating 1",
-      "Rating 2",
-      "Rating 3",
-      "Rating 4",
-      "Rating 5",
-      "Choice / Note",
+      "Scale Point / Choice / Note",
       "Count",
     ],
   ];
@@ -255,16 +250,17 @@ function buildQuestionResultsReport(context: ReportContext): ReportSheet[] {
       const ratings = answers
         .map((answer) => answer.ratingValue)
         .filter((value): value is number => value !== null);
-      rows.push([
-        question.section || "",
-        question.text,
-        question.type,
-        ratings.length,
-        average(ratings),
-        ...[1, 2, 3, 4, 5].map((rating) => ratings.filter((value) => value === rating).length),
-        "",
-        "",
-      ]);
+      for (const rating of ratingOptions(question)) {
+        rows.push([
+          question.section || "",
+          question.text,
+          question.type,
+          ratings.length,
+          average(ratings),
+          rating,
+          ratings.filter((value) => value === rating).length,
+        ]);
+      }
     } else if (question.type === "multiple_choice") {
       const choices = answers
         .map((answer) => answer.choiceValue)
@@ -277,18 +273,21 @@ function buildQuestionResultsReport(context: ReportContext): ReportSheet[] {
           question.type,
           choices.length,
           "",
-          "",
-          "",
-          "",
-          "",
-          "",
           option,
           choices.filter((choice) => choice === option).length,
         ]);
       }
     } else {
       const comments = textAnswers(answers);
-      rows.push([question.section || "", question.text, question.type, comments.length, "", "", "", "", "", "", "Written comments", comments.length]);
+      rows.push([
+        question.section || "",
+        question.text,
+        question.type,
+        comments.length,
+        "",
+        "Written comments",
+        comments.length,
+      ]);
     }
   }
 
@@ -738,6 +737,20 @@ function safeJsonArray(value: string) {
     return Array.isArray(parsed) ? parsed.map(String) : [];
   } catch {
     return [];
+  }
+}
+
+function ratingOptions(question: { options: string | null }) {
+  if (!question.options) return [1, 2, 3, 4, 5];
+  try {
+    const parsed = JSON.parse(question.options);
+    if (!Array.isArray(parsed)) return [1, 2, 3, 4, 5];
+    const values = parsed
+      .map((option) => Number(option))
+      .filter((option) => Number.isInteger(option));
+    return values.length ? values : [1, 2, 3, 4, 5];
+  } catch {
+    return [1, 2, 3, 4, 5];
   }
 }
 

@@ -21,6 +21,12 @@ interface Survey {
   startDate: string;
   endDate: string;
   questions: Question[];
+  demographicOptions?: {
+    departments: { id: string; name: string; employeeCount: number }[];
+    locations: { name: string; employeeCount: number }[];
+    currentDepartmentId: string | null;
+    currentLocation: string | null;
+  };
 }
 
 type AnswerValue = string | number | undefined;
@@ -34,6 +40,8 @@ export default function TakeSurveyPage({ params }: { params: Promise<{ surveyId:
   const [submitted, setSubmitted] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [departmentId, setDepartmentId] = useState("");
+  const [location, setLocation] = useState("");
 
   useEffect(() => {
     fetch(`/api/surveys/${surveyId}`)
@@ -41,6 +49,10 @@ export default function TakeSurveyPage({ params }: { params: Promise<{ surveyId:
       .then((d) => {
         setSurvey(d.data);
         if (d.data?.completed) setSubmitted(true);
+        if (d.data?.demographicOptions) {
+          setDepartmentId(d.data.demographicOptions.currentDepartmentId || "");
+          setLocation(d.data.demographicOptions.currentLocation || "");
+        }
       })
       .finally(() => setLoading(false));
   }, [surveyId]);
@@ -53,9 +65,13 @@ export default function TakeSurveyPage({ params }: { params: Promise<{ surveyId:
 
     const answerData = survey.questions.map((q) => {
       const val = answers[q.id];
+      const ratingValue =
+        q.type === "rating" && val !== undefined && val !== ""
+          ? Number(val)
+          : null;
       return {
         questionId: q.id,
-        ratingValue: q.type === "rating" ? Number(val) || null : null,
+        ratingValue,
         choiceValue: q.type === "multiple_choice" ? val || null : null,
         textValue: q.type === "free_text" ? val || null : null,
       };
@@ -64,7 +80,7 @@ export default function TakeSurveyPage({ params }: { params: Promise<{ surveyId:
     const res = await fetch(`/api/surveys/${surveyId}/responses`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ answers: answerData }),
+      body: JSON.stringify({ answers: answerData, departmentId, location }),
     });
 
     if (res.ok) {
@@ -155,16 +171,22 @@ export default function TakeSurveyPage({ params }: { params: Promise<{ surveyId:
 
   return (
     <div className="max-w-2xl mx-auto">
-      <div className="bg-white rounded-xl border border-slate-200 p-8">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-slate-900 mb-2">{survey.title}</h1>
+      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+        <div className="bg-slate-950 text-white p-6">
+          <div className="flex items-center gap-3">
+            <img src="/logo.svg" alt="Employee Pulse Survey" className="w-12 h-12 rounded-xl" />
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-teal-200">Clutch</p>
+              <h1 className="text-2xl font-bold">{survey.title}</h1>
+            </div>
+          </div>
           {survey.description && (
-            <p className="text-slate-500">{survey.description}</p>
+            <p className="mt-4 max-w-xl text-sm text-slate-300">{survey.description}</p>
           )}
         </div>
 
         {/* CONFIDENTIALITY NOTICE */}
-        <div className="mb-8 rounded-lg border border-emerald-200 bg-emerald-50 p-4">
+        <div className="m-6 mb-8 rounded-lg border border-emerald-200 bg-emerald-50 p-4">
           <div className="flex items-start gap-3">
             <div className="shrink-0 w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center">
               <svg className="w-5 h-5 text-emerald-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -182,7 +204,54 @@ export default function TakeSurveyPage({ params }: { params: Promise<{ surveyId:
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-10">
+        <form onSubmit={handleSubmit} className="space-y-10 px-6 pb-6">
+          <section className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <div className="mb-4">
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-primary">
+                Department and Location
+              </h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Only departments and locations with 10 or more active employees are listed.
+              </p>
+            </div>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <label className="block text-sm font-medium text-slate-800 mb-1.5">
+                  Department
+                </label>
+                <select
+                  value={departmentId}
+                  onChange={(e) => setDepartmentId(e.target.value)}
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary"
+                >
+                  <option value="">My department is not listed</option>
+                  {(survey.demographicOptions?.departments || []).map((department) => (
+                    <option key={department.id} value={department.id}>
+                      {department.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-800 mb-1.5">
+                  Location
+                </label>
+                <select
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary"
+                >
+                  <option value="">My location is not listed</option>
+                  {(survey.demographicOptions?.locations || []).map((option) => (
+                    <option key={option.name} value={option.name}>
+                      {option.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </section>
+
           {groupedQuestions.map((group) => (
             <section key={group.section} className="space-y-6">
               {group.section && (
@@ -201,13 +270,13 @@ export default function TakeSurveyPage({ params }: { params: Promise<{ surveyId:
                   </label>
 
                   {q.type === "rating" && (
-                    <div className="flex gap-2">
-                      {[1, 2, 3, 4, 5].map((v) => (
+                    <div className={ratingOptions(q).length > 5 ? "grid grid-cols-6 gap-2 sm:grid-cols-11" : "flex gap-2"}>
+                      {ratingOptions(q).map((v) => (
                         <button
                           key={v}
                           type="button"
                           onClick={() => setAnswers({ ...answers, [q.id]: v })}
-                          className={`w-12 h-12 rounded-lg border-2 text-lg font-semibold transition ${
+                          className={`${ratingOptions(q).length > 5 ? "h-12" : "w-12 h-12"} rounded-lg border-2 text-lg font-semibold transition ${
                             answers[q.id] === v
                               ? "border-primary bg-primary text-white"
                               : "border-slate-200 text-slate-600 hover:border-primary/50"
@@ -292,4 +361,19 @@ function groupQuestions(questions: Question[]) {
   });
 
   return groups;
+}
+
+function ratingOptions(question: Question) {
+  if (!question.options) return [1, 2, 3, 4, 5];
+
+  try {
+    const parsed = JSON.parse(question.options);
+    if (!Array.isArray(parsed)) return [1, 2, 3, 4, 5];
+    const values = parsed
+      .map((option) => Number(option))
+      .filter((option) => Number.isInteger(option));
+    return values.length > 0 ? values : [1, 2, 3, 4, 5];
+  } catch {
+    return [1, 2, 3, 4, 5];
+  }
 }

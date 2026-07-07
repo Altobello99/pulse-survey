@@ -2,6 +2,10 @@ import { NextRequest } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import {
+  getAnonymousFallbackDepartmentId,
+  getEligibleSurveyDemographics,
+} from "@/lib/demographic-options";
 
 type SubmittedAnswer = {
   questionId: string;
@@ -49,7 +53,46 @@ export async function POST(
   }
 
   const body = await request.json();
-  const { answers } = body as { answers?: SubmittedAnswer[] };
+  const { answers, departmentId, location } = body as {
+    answers?: SubmittedAnswer[];
+    departmentId?: string | null;
+    location?: string | null;
+  };
+  const demographicOptions = await getEligibleSurveyDemographics();
+  const eligibleDepartmentIds = new Set(
+    demographicOptions.departments.map((department) => department.id)
+  );
+  const eligibleLocations = new Set(
+    demographicOptions.locations.map((option) => option.name)
+  );
+  const requestedDepartmentId = departmentId?.trim() || "";
+  const requestedLocation = location?.trim() || "";
+
+  if (requestedDepartmentId && !eligibleDepartmentIds.has(requestedDepartmentId)) {
+    return Response.json(
+      { error: "That department is not available for this survey." },
+      { status: 400 }
+    );
+  }
+
+  if (requestedLocation && !eligibleLocations.has(requestedLocation)) {
+    return Response.json(
+      { error: "That location is not available for this survey." },
+      { status: 400 }
+    );
+  }
+
+  const departmentEligibleFromBamboo = eligibleDepartmentIds.has(session.user.departmentId);
+  const locationEligibleFromBamboo = session.user.location
+    ? eligibleLocations.has(session.user.location)
+    : false;
+  const safeDepartmentId =
+    requestedDepartmentId ||
+    (departmentEligibleFromBamboo
+      ? session.user.departmentId
+      : await getAnonymousFallbackDepartmentId());
+  const safeLocation =
+    requestedLocation || (locationEligibleFromBamboo ? session.user.location : null);
 
   // CONFIDENTIALITY: Round submittedAt to nearest hour so it cannot be
   // correlated with login timestamps or auth logs to identify respondents.
@@ -68,10 +111,10 @@ export async function POST(
     prisma.surveyResponse.create({
       data: {
         surveyId,
-        departmentId: session.user.departmentId,
+        departmentId: safeDepartmentId,
         teamId: safeTeamId,
         managerEmail: session.user.managerEmail,
-        location: session.user.location,
+        location: safeLocation,
         division: session.user.division,
         submittedAt: fuzzedTime,
         answers: {
