@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { ANONYMITY_THRESHOLD } from "@/lib/constants";
-import { activeBambooEmployeeWhere } from "@/lib/access";
+import { departmentedBambooEmployeeWhere } from "@/lib/access";
 
 // Cross-tab analytics: slice survey results by department, tenure bracket, and job level
 export async function GET(req: NextRequest) {
@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
 
   // Get all users for tenure + level data (linked by department/team, not by response)
   const users = await prisma.user.findMany({
-    where: activeBambooEmployeeWhere,
+    where: departmentedBambooEmployeeWhere,
     select: { departmentId: true, teamId: true, hireDate: true, jobLevel: true },
   });
 

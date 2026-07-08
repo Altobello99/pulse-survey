@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { DEMOGRAPHIC_OPTION_EMPLOYEE_THRESHOLD } from "@/lib/constants";
-import { activeBambooEmployeeWhere } from "@/lib/access";
+import { departmentedBambooEmployeeWhere } from "@/lib/access";
 
 export type EligibleDepartmentOption = {
   id: string;
@@ -17,23 +17,23 @@ export async function getEligibleSurveyDemographics() {
   const [departmentCounts, divisionCounts, teamCounts, locationCounts] = await Promise.all([
     prisma.user.groupBy({
       by: ["departmentId"],
-      where: activeBambooEmployeeWhere,
+      where: departmentedBambooEmployeeWhere,
       _count: { _all: true },
     }),
     prisma.user.groupBy({
       by: ["division"],
-      where: { ...activeBambooEmployeeWhere, division: { not: null } },
+      where: { AND: [departmentedBambooEmployeeWhere, { division: { not: null } }] },
       _count: { _all: true },
       orderBy: { division: "asc" },
     }),
     prisma.user.groupBy({
       by: ["teamId"],
-      where: { ...activeBambooEmployeeWhere, teamId: { not: null } },
+      where: { AND: [departmentedBambooEmployeeWhere, { teamId: { not: null } }] },
       _count: { _all: true },
     }),
     prisma.user.groupBy({
       by: ["location"],
-      where: { ...activeBambooEmployeeWhere, location: { not: null } },
+      where: { AND: [departmentedBambooEmployeeWhere, { location: { not: null } }] },
       _count: { _all: true },
       orderBy: { location: "asc" },
     }),

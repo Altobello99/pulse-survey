@@ -23,6 +23,13 @@ export const activeBambooEmployeeWhere = {
   bambooHrId: { not: null },
 } satisfies Prisma.UserWhereInput;
 
+export const departmentedBambooEmployeeWhere = {
+  AND: [
+    activeBambooEmployeeWhere,
+    { department: { name: { not: "Unassigned" } } },
+  ],
+} satisfies Prisma.UserWhereInput;
+
 export function normalizeEmail(email: string | null | undefined) {
   return (email || "").trim().toLowerCase();
 }
@@ -57,7 +64,7 @@ export async function getManagerScope(user: SessionUser) {
   }
 
   const allActiveUsers = await prisma.user.findMany({
-    where: activeBambooEmployeeWhere,
+    where: departmentedBambooEmployeeWhere,
     select: {
       id: true,
       email: true,
@@ -110,14 +117,14 @@ export async function getManagerScope(user: SessionUser) {
 }
 
 export async function getScopedEmployeeWhere(user: SessionUser): Promise<Prisma.UserWhereInput> {
-  if (user.role === "admin") return activeBambooEmployeeWhere;
+  if (user.role === "admin") return departmentedBambooEmployeeWhere;
   if (user.role === "manager") {
     const scope = await getManagerScope(user);
     return scope.employeeIds.length
-      ? { AND: [activeBambooEmployeeWhere, { id: { in: scope.employeeIds } }] }
+      ? { AND: [departmentedBambooEmployeeWhere, { id: { in: scope.employeeIds } }] }
       : { id: "__none__" };
   }
-  return { AND: [activeBambooEmployeeWhere, { id: user.id }] };
+  return { AND: [departmentedBambooEmployeeWhere, { id: user.id }] };
 }
 
 export async function getScopedResponseWhere(

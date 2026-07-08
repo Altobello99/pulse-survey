@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { activeBambooEmployeeWhere } from "@/lib/access";
+import { departmentedBambooEmployeeWhere } from "@/lib/access";
 import {
   getAnonymousFallbackDepartmentId,
   getEligibleSurveyDemographics,
@@ -32,7 +32,7 @@ export async function POST(
   }
 
   const employee = await prisma.user.findFirst({
-    where: { AND: [activeBambooEmployeeWhere, { id: session.user.id }] },
+    where: { AND: [departmentedBambooEmployeeWhere, { id: session.user.id }] },
     select: {
       departmentId: true,
       division: true,
@@ -42,7 +42,10 @@ export async function POST(
     },
   });
   if (!employee) {
-    return Response.json({ error: "Only active BambooHR employees can submit surveys" }, { status: 403 });
+    return Response.json(
+      { error: "Your BambooHR Job Information is missing a department. Please contact HR before submitting the survey." },
+      { status: 403 }
+    );
   }
 
   const { surveyId } = await params;

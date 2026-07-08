@@ -1,7 +1,7 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { activeBambooEmployeeWhere } from "@/lib/access";
+import { departmentedBambooEmployeeWhere } from "@/lib/access";
 
 export async function GET() {
   const session = await getServerSession(authOptions);
@@ -11,7 +11,7 @@ export async function GET() {
 
   const departmentCounts = await prisma.user.groupBy({
     by: ["departmentId"],
-    where: activeBambooEmployeeWhere,
+    where: departmentedBambooEmployeeWhere,
     _count: { _all: true },
   });
   const employeeCountsByDepartment = new Map(
@@ -34,7 +34,7 @@ export async function GET() {
     departments.map(async (dept) => {
       const employeeCount = employeeCountsByDepartment.get(dept.id) || 0;
       const employeeWhere = {
-        AND: [activeBambooEmployeeWhere, { departmentId: dept.id }],
+        AND: [departmentedBambooEmployeeWhere, { departmentId: dept.id }],
       };
       const recentCompletions = latestSurvey
         ? await prisma.surveyCompletion.count({
