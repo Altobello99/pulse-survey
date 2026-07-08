@@ -34,7 +34,10 @@ export async function getEligibleSurveyDemographics() {
   );
 
   const departments = await prisma.department.findMany({
-    where: { id: { in: [...eligibleDepartmentCounts.keys()] } },
+    where: {
+      id: { in: [...eligibleDepartmentCounts.keys()] },
+      name: { not: "Unassigned" },
+    },
     orderBy: { name: "asc" },
   });
 
