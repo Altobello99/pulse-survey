@@ -384,7 +384,7 @@ function RatingInput({
     options[2] === 3 &&
     options[3] === 4 &&
     options[4] === 5;
-  const labels = ["Strongly disagree", "Disagree", "Neutral", "Agree", "Strongly agree"];
+  const labels = ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"];
 
   if (isAgreementScale) {
     return (
