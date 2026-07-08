@@ -34,11 +34,17 @@ type BambooListResponse = {
   };
 };
 
+type BambooCustomReportResponse = {
+  employees?: BambooEmployee[];
+};
+
 export type BambooSyncResult = {
   synced: number;
   admins: number;
   managers: number;
   deactivated: number;
+  withDepartments: number;
+  withLocations: number;
 };
 
 const fields = [
@@ -70,7 +76,8 @@ export async function syncBambooEmployees(): Promise<BambooSyncResult> {
   const employees = await fetchActiveEmployees(companyDomain, apiKey);
   const normalized = employees
     .map(normalizeEmployee)
-    .filter((employee): employee is ReturnType<typeof normalizeEmployee> & { email: string } => Boolean(employee.email));
+    .filter((employee): employee is ReturnType<typeof normalizeEmployee> & { email: string } => Boolean(employee.email))
+    .filter((employee) => isActiveEmploymentStatus(employee.employmentStatus));
 
   const seenEmails = new Set(normalized.map((employee) => employee.email));
   const managerEmails = new Set(
@@ -162,10 +169,45 @@ export async function syncBambooEmployees(): Promise<BambooSyncResult> {
     admins: adminCount,
     managers: managerCount,
     deactivated: deactivated.count,
+    withDepartments: normalized.filter((employee) => employee.department !== "Unassigned").length,
+    withLocations: normalized.filter((employee) => Boolean(employee.location)).length,
   };
 }
 
 async function fetchActiveEmployees(companyDomain: string, apiKey: string) {
+  try {
+    return await fetchEmployeesFromCustomReport(companyDomain, apiKey);
+  } catch {
+    return fetchEmployeesFromListEndpoint(companyDomain, apiKey);
+  }
+}
+
+async function fetchEmployeesFromCustomReport(companyDomain: string, apiKey: string) {
+  const url = new URL(`https://${companyDomain}.bamboohr.com/api/v1/reports/custom`);
+  url.searchParams.set("format", "json");
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      Authorization: `Basic ${Buffer.from(`${apiKey}:x`).toString("base64")}`,
+    },
+    body: JSON.stringify({
+      title: "Employee Pulse Survey Sync",
+      fields: fields.split(","),
+    }),
+  });
+
+  if (!res.ok) {
+    throw new Error(`BambooHR custom report failed: ${res.status} ${res.statusText}`);
+  }
+
+  const json = (await res.json()) as BambooCustomReportResponse;
+  return json.employees || [];
+}
+
+async function fetchEmployeesFromListEndpoint(companyDomain: string, apiKey: string) {
   const employees: BambooEmployee[] = [];
   let cursor: string | null = null;
 
@@ -208,12 +250,19 @@ function normalizeEmployee(employee: BambooEmployee) {
     bambooHrId: employee.employeeId || employee.id || null,
     employeeNumber: employee.employeeNumber || null,
     jobTitle: employee.jobTitle || null,
+    employmentStatus: employee.employmentStatus || null,
     department: employee.department || "Unassigned",
     division: employee.division || null,
     location: employee.location || null,
     managerEmail,
     hireDate: employee.hireDate ? new Date(employee.hireDate) : null,
   };
+}
+
+function isActiveEmploymentStatus(status: string | null | undefined) {
+  const normalized = (status || "").trim().toLowerCase();
+  if (!normalized) return true;
+  return !["inactive", "terminated", "deceased"].includes(normalized);
 }
 
 function extractEmail(value: string | null | undefined) {

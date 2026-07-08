@@ -270,22 +270,11 @@ export default function TakeSurveyPage({ params }: { params: Promise<{ surveyId:
                   </label>
 
                   {q.type === "rating" && (
-                    <div className={ratingOptions(q).length > 5 ? "grid grid-cols-6 gap-2 sm:grid-cols-11" : "flex gap-2"}>
-                      {ratingOptions(q).map((v) => (
-                        <button
-                          key={v}
-                          type="button"
-                          onClick={() => setAnswers({ ...answers, [q.id]: v })}
-                          className={`${ratingOptions(q).length > 5 ? "h-12" : "w-12 h-12"} rounded-lg border-2 text-lg font-semibold transition ${
-                            answers[q.id] === v
-                              ? "border-primary bg-primary text-white"
-                              : "border-slate-200 text-slate-600 hover:border-primary/50"
-                          }`}
-                        >
-                          {v}
-                        </button>
-                      ))}
-                    </div>
+                    <RatingInput
+                      question={q}
+                      value={answers[q.id]}
+                      onChange={(value) => setAnswers({ ...answers, [q.id]: value })}
+                    />
                   )}
 
                   {q.type === "multiple_choice" && q.options && (
@@ -376,4 +365,69 @@ function ratingOptions(question: Question) {
   } catch {
     return [1, 2, 3, 4, 5];
   }
+}
+
+function RatingInput({
+  question,
+  value,
+  onChange,
+}: {
+  question: Question;
+  value: AnswerValue;
+  onChange: (value: number) => void;
+}) {
+  const options = ratingOptions(question);
+  const isAgreementScale =
+    options.length === 5 &&
+    options[0] === 1 &&
+    options[1] === 2 &&
+    options[2] === 3 &&
+    options[3] === 4 &&
+    options[4] === 5;
+  const labels = ["Strongly disagree", "Disagree", "Neutral", "Agree", "Strongly agree"];
+
+  if (isAgreementScale) {
+    return (
+      <div className="inline-grid grid-cols-5 gap-2">
+        {options.map((option) => (
+          <button
+            key={option}
+            type="button"
+            onClick={() => onChange(option)}
+            className={`w-12 h-12 rounded-lg border-2 text-lg font-semibold transition ${
+              value === option
+                ? "border-primary bg-primary text-white"
+                : "border-slate-200 text-slate-600 hover:border-primary/50"
+            }`}
+          >
+            {option}
+          </button>
+        ))}
+        {labels.map((label) => (
+          <span key={label} className="w-12 text-center text-[10px] leading-tight text-slate-500">
+            {label}
+          </span>
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-6 gap-2 sm:grid-cols-11">
+      {options.map((option) => (
+        <button
+          key={option}
+          type="button"
+          onClick={() => onChange(option)}
+          className={`h-12 rounded-lg border-2 text-lg font-semibold transition ${
+            value === option
+              ? "border-primary bg-primary text-white"
+              : "border-slate-200 text-slate-600 hover:border-primary/50"
+          }`}
+        >
+          {option}
+        </button>
+      ))}
+    </div>
+  );
 }
