@@ -80,7 +80,11 @@ const providers: NextAuthOptions["providers"] = [
       if (!user) return null;
       if (isAdminPortalLogin && user.role !== "admin") return null;
       if (!isAdminPortalLogin && user.role === "admin") return null;
-      if (!isAdminEmail(user.email) && (user.status !== "active" || !user.bambooHrId)) {
+      if (
+        !isAdminPortalLogin &&
+        !isAdminEmail(user.email) &&
+        (user.status !== "active" || !user.bambooHrId)
+      ) {
         return null;
       }
 
