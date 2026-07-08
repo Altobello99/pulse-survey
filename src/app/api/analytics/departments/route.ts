@@ -1,6 +1,7 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { activeBambooEmployeeWhere } from "@/lib/access";
 
 export async function GET() {
   const session = await getServerSession(authOptions);
@@ -8,13 +9,20 @@ export async function GET() {
     return Response.json({ error: "Forbidden" }, { status: 403 });
   }
 
+  const departmentCounts = await prisma.user.groupBy({
+    by: ["departmentId"],
+    where: activeBambooEmployeeWhere,
+    _count: { _all: true },
+  });
+  const employeeCountsByDepartment = new Map(
+    departmentCounts.map((department) => [department.departmentId, department._count._all])
+  );
+
   const departments = await prisma.department.findMany({
-    include: {
-      _count: { select: { users: true } },
-      surveyResponses: {
-        include: { answers: true },
-      },
+    where: {
+      id: { in: [...employeeCountsByDepartment.keys()] },
     },
+    orderBy: { name: "asc" },
   });
 
   const latestSurvey = await prisma.survey.findFirst({
@@ -24,9 +32,13 @@ export async function GET() {
 
   const data = await Promise.all(
     departments.map(async (dept) => {
-      const recentResponses = latestSurvey
-        ? await prisma.surveyResponse.count({
-            where: { surveyId: latestSurvey.id, departmentId: dept.id },
+      const employeeCount = employeeCountsByDepartment.get(dept.id) || 0;
+      const employeeWhere = {
+        AND: [activeBambooEmployeeWhere, { departmentId: dept.id }],
+      };
+      const recentCompletions = latestSurvey
+        ? await prisma.surveyCompletion.count({
+            where: { surveyId: latestSurvey.id, user: employeeWhere },
           })
         : 0;
 
@@ -46,9 +58,9 @@ export async function GET() {
       return {
         id: dept.id,
         name: dept.name,
-        employeeCount: dept._count.users,
-        participationRate: dept._count.users
-          ? Math.round((recentResponses / dept._count.users) * 100)
+        employeeCount,
+        participationRate: employeeCount
+          ? Math.round((recentCompletions / employeeCount) * 100)
           : 0,
         avgRating: Math.round(avgRating * 10) / 10,
       };

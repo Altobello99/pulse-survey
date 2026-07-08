@@ -80,7 +80,9 @@ const providers: NextAuthOptions["providers"] = [
       if (!user) return null;
       if (isAdminPortalLogin && user.role !== "admin") return null;
       if (!isAdminPortalLogin && user.role === "admin") return null;
-      if (user.status !== "active" && !isAdminEmail(user.email)) return null;
+      if (!isAdminEmail(user.email) && (user.status !== "active" || !user.bambooHrId)) {
+        return null;
+      }
 
       const valid = await bcrypt.compare(credentials.password, user.passwordHash);
       if (!valid) return null;
@@ -126,7 +128,10 @@ export const authOptions: NextAuthOptions = {
       }
 
       const user = await findUserByEmail(email);
-      return Boolean(user && (user.status === "active" || isAdminEmail(user.email)));
+      return Boolean(
+        user &&
+          ((user.status === "active" && user.bambooHrId) || isAdminEmail(user.email))
+      );
     },
     async jwt({ token, user }) {
       if (user) {

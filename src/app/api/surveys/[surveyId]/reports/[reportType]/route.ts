@@ -4,6 +4,7 @@ import * as XLSX from "xlsx";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { ANONYMITY_THRESHOLD } from "@/lib/constants";
+import { activeBambooEmployeeWhere } from "@/lib/access";
 import type { Prisma } from "@/generated/prisma/client";
 
 type ReportType =
@@ -133,7 +134,7 @@ async function buildReportContext(
   if (!survey) return null;
 
   const responseWhere = applyResponseFilters({ surveyId }, filters);
-  const employeeWhere = applyEmployeeFilters({ status: "active" }, filters);
+  const employeeWhere = applyEmployeeFilters(activeBambooEmployeeWhere, filters);
 
   const [responses, employees, completions] = await Promise.all([
     prisma.surveyResponse.findMany({

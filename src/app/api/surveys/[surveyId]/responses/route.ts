@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { activeBambooEmployeeWhere } from "@/lib/access";
 import {
   getAnonymousFallbackDepartmentId,
   getEligibleSurveyDemographics,
@@ -28,6 +29,20 @@ export async function POST(
   }
   if (session.user.status !== "active") {
     return Response.json({ error: "Only active employees can submit surveys" }, { status: 403 });
+  }
+
+  const employee = await prisma.user.findFirst({
+    where: { AND: [activeBambooEmployeeWhere, { id: session.user.id }] },
+    select: {
+      departmentId: true,
+      division: true,
+      teamId: true,
+      location: true,
+      managerEmail: true,
+    },
+  });
+  if (!employee) {
+    return Response.json({ error: "Only active BambooHR employees can submit surveys" }, { status: 403 });
   }
 
   const { surveyId } = await params;
@@ -106,27 +121,27 @@ export async function POST(
     );
   }
 
-  const departmentEligibleFromBamboo = eligibleDepartmentIds.has(session.user.departmentId);
-  const divisionEligibleFromBamboo = session.user.division
-    ? eligibleDivisions.has(session.user.division)
+  const departmentEligibleFromBamboo = eligibleDepartmentIds.has(employee.departmentId);
+  const divisionEligibleFromBamboo = employee.division
+    ? eligibleDivisions.has(employee.division)
     : false;
-  const teamEligibleFromBamboo = session.user.teamId
-    ? eligibleTeamIds.has(session.user.teamId)
+  const teamEligibleFromBamboo = employee.teamId
+    ? eligibleTeamIds.has(employee.teamId)
     : false;
-  const locationEligibleFromBamboo = session.user.location
-    ? eligibleLocations.has(session.user.location)
+  const locationEligibleFromBamboo = employee.location
+    ? eligibleLocations.has(employee.location)
     : false;
   const safeDepartmentId =
     requestedDepartmentId ||
     (departmentEligibleFromBamboo
-      ? session.user.departmentId
+      ? employee.departmentId
       : await getAnonymousFallbackDepartmentId());
   const safeDivision =
-    requestedDivision || (divisionEligibleFromBamboo ? session.user.division : null);
+    requestedDivision || (divisionEligibleFromBamboo ? employee.division : null);
   const safeTeamId =
-    requestedTeamId || (teamEligibleFromBamboo ? session.user.teamId : null);
+    requestedTeamId || (teamEligibleFromBamboo ? employee.teamId : null);
   const safeLocation =
-    requestedLocation || (locationEligibleFromBamboo ? session.user.location : null);
+    requestedLocation || (locationEligibleFromBamboo ? employee.location : null);
 
   // CONFIDENTIALITY: Round submittedAt to nearest hour so it cannot be
   // correlated with login timestamps or auth logs to identify respondents.
@@ -140,7 +155,7 @@ export async function POST(
         surveyId,
         departmentId: safeDepartmentId,
         teamId: safeTeamId,
-        managerEmail: session.user.managerEmail,
+        managerEmail: employee.managerEmail,
         location: safeLocation,
         division: safeDivision,
         submittedAt: fuzzedTime,

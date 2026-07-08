@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { sendEmail, surveyReminderHtml } from "@/lib/email";
+import { activeBambooEmployeeWhere } from "@/lib/access";
 
 // Send reminder emails to employees who haven't completed the survey
 export async function POST(
@@ -26,7 +27,7 @@ export async function POST(
   const completedSet = new Set(completedUserIds.map((c) => c.userId));
 
   const pendingUsers = await prisma.user.findMany({
-    where: { role: { not: "admin" } },
+    where: { AND: [activeBambooEmployeeWhere, { role: { not: "admin" } }] },
     select: { id: true, email: true },
   });
 

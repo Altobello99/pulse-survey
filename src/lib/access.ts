@@ -18,6 +18,11 @@ export type AccessFilters = {
 
 type SessionUser = Session["user"];
 
+export const activeBambooEmployeeWhere = {
+  status: "active",
+  bambooHrId: { not: null },
+} satisfies Prisma.UserWhereInput;
+
 export function normalizeEmail(email: string | null | undefined) {
   return (email || "").trim().toLowerCase();
 }
@@ -52,7 +57,7 @@ export async function getManagerScope(user: SessionUser) {
   }
 
   const allActiveUsers = await prisma.user.findMany({
-    where: { status: "active" },
+    where: activeBambooEmployeeWhere,
     select: {
       id: true,
       email: true,
@@ -105,12 +110,14 @@ export async function getManagerScope(user: SessionUser) {
 }
 
 export async function getScopedEmployeeWhere(user: SessionUser): Promise<Prisma.UserWhereInput> {
-  if (user.role === "admin") return { status: "active" };
+  if (user.role === "admin") return activeBambooEmployeeWhere;
   if (user.role === "manager") {
     const scope = await getManagerScope(user);
-    return scope.employeeIds.length ? { id: { in: scope.employeeIds }, status: "active" } : { id: "__none__" };
+    return scope.employeeIds.length
+      ? { AND: [activeBambooEmployeeWhere, { id: { in: scope.employeeIds } }] }
+      : { id: "__none__" };
   }
-  return { id: user.id, status: "active" };
+  return { AND: [activeBambooEmployeeWhere, { id: user.id }] };
 }
 
 export async function getScopedResponseWhere(
