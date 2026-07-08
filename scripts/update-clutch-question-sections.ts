@@ -61,7 +61,7 @@ const groupedQuestions = [
   },
   {
     section: "Ending Questions",
-    text: "What one thing would help you or your team drive better results this quarter?",
+    text: "What one thing would help you or your team drive better results?",
   },
 ];
 

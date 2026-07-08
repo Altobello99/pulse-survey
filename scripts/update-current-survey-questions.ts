@@ -82,7 +82,7 @@ const questions: QuestionInput[] = [
   },
   {
     section: "Ending Questions",
-    text: "What one thing would help you or your team drive better results this quarter?",
+    text: "What one thing would help you or your team drive better results?",
     type: "free_text",
     required: false,
   },
@@ -101,6 +101,9 @@ async function main() {
 
   for (const existing of survey.questions) {
     if (desiredByText.has(existing.text)) continue;
+    if (existing.text === "What one thing would help you or your team drive better results this quarter?") {
+      continue;
+    }
     if (existing.text.toLowerCase().includes("workload")) {
       await prisma.answer.deleteMany({ where: { questionId: existing.id } });
       await prisma.question.delete({ where: { id: existing.id } });
@@ -109,7 +112,13 @@ async function main() {
   }
 
   for (const [order, question] of questions.entries()) {
-    const existing = survey.questions.find((item) => item.text === question.text);
+    const existing = survey.questions.find((item) => item.text === question.text) ||
+      (question.text === "What one thing would help you or your team drive better results?"
+        ? survey.questions.find(
+            (item) =>
+              item.text === "What one thing would help you or your team drive better results this quarter?"
+          )
+        : undefined);
     const data = {
       section: question.section,
       text: question.text,
