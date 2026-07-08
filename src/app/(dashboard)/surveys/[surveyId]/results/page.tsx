@@ -62,10 +62,12 @@ interface ResultData {
   completions: number;
   sentiment: SentimentData | null;
   departmentBreakdown: DeptBreakdown[];
+  divisionBreakdown: DeptBreakdown[];
   teamBreakdown: DeptBreakdown[];
   locationBreakdown: DeptBreakdown[];
   filterOptions: {
     departments: FilterOption[];
+    divisions: string[];
     teams: FilterOption[];
     locations: string[];
   };
@@ -91,12 +93,14 @@ export default function SurveyResultsPage({
   const [loading, setLoading] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
   const [departmentId, setDepartmentId] = useState("");
+  const [division, setDivision] = useState("");
   const [teamId, setTeamId] = useState("");
   const [location, setLocation] = useState("");
 
   const fetchResults = useCallback(() => {
     const params = new URLSearchParams();
     if (departmentId) params.set("departmentId", departmentId);
+    if (division) params.set("division", division);
     if (teamId) params.set("teamId", teamId);
     if (location) params.set("location", location);
 
@@ -104,7 +108,7 @@ export default function SurveyResultsPage({
       .then((r) => r.json())
       .then((d) => setResult(d.data))
       .finally(() => setLoading(false));
-  }, [surveyId, departmentId, teamId, location]);
+  }, [surveyId, departmentId, division, teamId, location]);
 
   useEffect(() => {
     fetchResults();
@@ -139,12 +143,13 @@ export default function SurveyResultsPage({
   const themes: string[] = sentiment ? JSON.parse(sentiment.themes) : [];
   const insights: string[] = sentiment ? JSON.parse(sentiment.insights) : [];
   const groupedQuestionResults = groupQuestionResults(result.questionResults);
-  const hasActiveFilters = Boolean(departmentId || teamId || location);
+  const hasActiveFilters = Boolean(departmentId || division || teamId || location);
 
   function reportHref(reportType: string, format: "xlsx" | "csv", scope: "filtered" | "company") {
     const params = new URLSearchParams({ format, scope });
     if (scope === "filtered") {
       if (departmentId) params.set("departmentId", departmentId);
+      if (division) params.set("division", division);
       if (teamId) params.set("teamId", teamId);
       if (location) params.set("location", location);
     }
@@ -183,7 +188,7 @@ export default function SurveyResultsPage({
 
       {(session?.user.role === "admin" || session?.user.role === "manager") && (
         <div className="bg-white rounded-xl border border-slate-200 p-4">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
             <select
               value={departmentId}
               onChange={(e) => setDepartmentId(e.target.value)}
@@ -195,11 +200,21 @@ export default function SurveyResultsPage({
               ))}
             </select>
             <select
+              value={division}
+              onChange={(e) => setDivision(e.target.value)}
+              className="px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+            >
+              <option value="">All divisions</option>
+              {result.filterOptions?.divisions.map((option) => (
+                <option key={option} value={option}>{option}</option>
+              ))}
+            </select>
+            <select
               value={teamId}
               onChange={(e) => setTeamId(e.target.value)}
               className="px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
             >
-              <option value="">All teams</option>
+              <option value="">All shifts / lines</option>
               {result.filterOptions?.teams.map((team) => (
                 <option key={team.id} value={team.id}>{team.name}</option>
               ))}
@@ -218,6 +233,7 @@ export default function SurveyResultsPage({
               type="button"
               onClick={() => {
                 setDepartmentId("");
+                setDivision("");
                 setTeamId("");
                 setLocation("");
               }}
@@ -385,9 +401,10 @@ export default function SurveyResultsPage({
         </div>
       )}
 
-      {!result.suppressed && (result.teamBreakdown?.length > 0 || result.locationBreakdown?.length > 0) && (
+      {!result.suppressed && (result.divisionBreakdown?.length > 0 || result.teamBreakdown?.length > 0 || result.locationBreakdown?.length > 0) && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <BreakdownList title="Team Breakdown" rows={result.teamBreakdown || []} />
+          <BreakdownList title="Division Breakdown" rows={result.divisionBreakdown || []} />
+          <BreakdownList title="Shift / Line Breakdown" rows={result.teamBreakdown || []} />
           <BreakdownList title="Location Breakdown" rows={result.locationBreakdown || []} />
         </div>
       )}

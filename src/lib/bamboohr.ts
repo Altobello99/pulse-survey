@@ -6,6 +6,7 @@ import { isAdminEmail, normalizeEmail } from "@/lib/access";
 const DEFAULT_COMPANY_DOMAIN = "clutchtechnologiesinc";
 
 type BambooEmployee = {
+  [key: string]: unknown;
   employeeId?: string;
   id?: string;
   employeeNumber?: string | null;
@@ -19,8 +20,11 @@ type BambooEmployee = {
   department?: string | null;
   division?: string | null;
   location?: string | null;
+  team?: string | null;
+  teams?: string | null;
   supervisor?: string | null;
   supervisorEmail?: string | null;
+  reportsTo?: string | null;
   employmentStatus?: string | null;
   hireDate?: string | null;
 };
@@ -38,16 +42,24 @@ type BambooCustomReportResponse = {
   employees?: BambooEmployee[];
 };
 
+type BambooFieldMetadata = {
+  id?: string | number;
+  name?: string | null;
+  alias?: string | null;
+};
+
 export type BambooSyncResult = {
   synced: number;
   admins: number;
   managers: number;
   deactivated: number;
   withDepartments: number;
+  withDivisions: number;
   withLocations: number;
+  withTeams: number;
 };
 
-const fields = [
+const baseFields = [
   "workEmail",
   "bestEmail",
   "firstName",
@@ -58,12 +70,15 @@ const fields = [
   "department",
   "division",
   "location",
+  "team",
+  "teams",
   "supervisor",
   "supervisorEmail",
+  "reportsTo",
   "employmentStatus",
   "hireDate",
   "employeeNumber",
-].join(",");
+];
 
 export async function syncBambooEmployees(): Promise<BambooSyncResult> {
   const apiKey = process.env.BAMBOOHR_API_KEY;
@@ -73,9 +88,10 @@ export async function syncBambooEmployees(): Promise<BambooSyncResult> {
     throw new Error("BAMBOOHR_API_KEY is not configured");
   }
 
-  const employees = await fetchActiveEmployees(companyDomain, apiKey);
+  const syncSource = await fetchActiveEmployees(companyDomain, apiKey);
+  const employees = syncSource.employees;
   const normalized = employees
-    .map(normalizeEmployee)
+    .map((employee) => normalizeEmployee(employee, syncSource.teamFieldKeys))
     .filter((employee): employee is ReturnType<typeof normalizeEmployee> & { email: string } => Boolean(employee.email))
     .filter((employee) => isActiveEmploymentStatus(employee.employmentStatus));
 
@@ -97,7 +113,7 @@ export async function syncBambooEmployees(): Promise<BambooSyncResult> {
       update: {},
     });
 
-    const teamName = employee.division || employee.location || employee.department;
+    const teamName = employee.team || employee.division || employee.location || employee.department;
     const team = await prisma.team.upsert({
       where: { name_departmentId: { name: teamName, departmentId: department.id } },
       create: { name: teamName, departmentId: department.id },
@@ -170,19 +186,59 @@ export async function syncBambooEmployees(): Promise<BambooSyncResult> {
     managers: managerCount,
     deactivated: deactivated.count,
     withDepartments: normalized.filter((employee) => employee.department !== "Unassigned").length,
+    withDivisions: normalized.filter((employee) => Boolean(employee.division)).length,
     withLocations: normalized.filter((employee) => Boolean(employee.location)).length,
+    withTeams: normalized.filter((employee) => Boolean(employee.team)).length,
   };
 }
 
 async function fetchActiveEmployees(companyDomain: string, apiKey: string) {
+  const teamFieldKeys = await discoverTeamFieldKeys(companyDomain, apiKey);
+  const fields = unique([...baseFields, ...teamFieldKeys]);
+
   try {
-    return await fetchEmployeesFromCustomReport(companyDomain, apiKey);
+    return {
+      employees: await fetchEmployeesFromCustomReport(companyDomain, apiKey, fields),
+      teamFieldKeys,
+    };
   } catch {
-    return fetchEmployeesFromListEndpoint(companyDomain, apiKey);
+    return {
+      employees: await fetchEmployeesFromListEndpoint(companyDomain, apiKey, fields),
+      teamFieldKeys,
+    };
   }
 }
 
-async function fetchEmployeesFromCustomReport(companyDomain: string, apiKey: string) {
+async function discoverTeamFieldKeys(companyDomain: string, apiKey: string) {
+  try {
+    const url = new URL(`https://${companyDomain}.bamboohr.com/api/v1/meta/fields`);
+    const res = await fetch(url, {
+      headers: {
+        Accept: "application/json",
+        Authorization: `Basic ${Buffer.from(`${apiKey}:x`).toString("base64")}`,
+      },
+    });
+
+    if (!res.ok) return [];
+
+    const fields = (await res.json()) as BambooFieldMetadata[];
+    return unique(
+      fields
+        .filter((field) => {
+          const name = String(field.name || "").trim().toLowerCase();
+          const alias = String(field.alias || "").trim().toLowerCase();
+          return ["team", "teams"].includes(name) || ["team", "teams"].includes(alias);
+        })
+        .flatMap((field) => [field.alias, field.id])
+        .filter((value): value is string | number => Boolean(value))
+        .map(String)
+    );
+  } catch {
+    return [];
+  }
+}
+
+async function fetchEmployeesFromCustomReport(companyDomain: string, apiKey: string, fields: string[]) {
   const url = new URL(`https://${companyDomain}.bamboohr.com/api/v1/reports/custom`);
   url.searchParams.set("format", "json");
 
@@ -195,7 +251,7 @@ async function fetchEmployeesFromCustomReport(companyDomain: string, apiKey: str
     },
     body: JSON.stringify({
       title: "Employee Pulse Survey Sync",
-      fields: fields.split(","),
+      fields,
     }),
   });
 
@@ -207,13 +263,13 @@ async function fetchEmployeesFromCustomReport(companyDomain: string, apiKey: str
   return json.employees || [];
 }
 
-async function fetchEmployeesFromListEndpoint(companyDomain: string, apiKey: string) {
+async function fetchEmployeesFromListEndpoint(companyDomain: string, apiKey: string, fields: string[]) {
   const employees: BambooEmployee[] = [];
   let cursor: string | null = null;
 
   do {
     const url = new URL(`https://${companyDomain}.bamboohr.com/api/v1/employees`);
-    url.searchParams.set("fields", fields);
+    url.searchParams.set("fields", fields.join(","));
     url.searchParams.set("filter[status]", "active");
     url.searchParams.set("page[limit]", "2500");
     if (cursor) url.searchParams.set("page[after]", cursor);
@@ -237,12 +293,13 @@ async function fetchEmployeesFromListEndpoint(companyDomain: string, apiKey: str
   return employees;
 }
 
-function normalizeEmployee(employee: BambooEmployee) {
+function normalizeEmployee(employee: BambooEmployee, teamFieldKeys: string[]) {
   const email = normalizeEmail(employee.workEmail || employee.bestEmail);
   const firstName = (employee.preferredName || employee.firstName || "").trim();
   const lastName = (employee.lastName || "").trim();
   const name = (employee.displayName || `${firstName} ${lastName}`.trim() || email).trim();
-  const managerEmail = extractEmail(employee.supervisorEmail || employee.supervisor);
+  const managerEmail = extractEmail(employee.supervisorEmail || employee.supervisor || employee.reportsTo);
+  const team = firstStringValue(employee, ["teams", "team", ...teamFieldKeys]);
 
   return {
     email,
@@ -254,9 +311,20 @@ function normalizeEmployee(employee: BambooEmployee) {
     department: employee.department || "Unassigned",
     division: employee.division || null,
     location: employee.location || null,
+    team,
     managerEmail,
     hireDate: parseBambooDate(employee.hireDate),
   };
+}
+
+function firstStringValue(employee: BambooEmployee, keys: string[]) {
+  for (const key of keys) {
+    const value = employee[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+    if (typeof value === "number") return String(value);
+  }
+
+  return null;
 }
 
 function parseBambooDate(value: string | null | undefined) {
@@ -276,4 +344,8 @@ function extractEmail(value: string | null | undefined) {
   if (!raw) return null;
   const match = raw.match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/);
   return match?.[0] || null;
+}
+
+function unique(values: string[]) {
+  return [...new Set(values.filter(Boolean))];
 }

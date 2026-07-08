@@ -33,6 +33,16 @@ export async function GET(
   )
     ? session.user.departmentId
     : null;
+  const currentDivision = demographicOptions.divisions.some(
+    (division) => division.name === session.user.division
+  )
+    ? session.user.division
+    : null;
+  const currentTeamId = demographicOptions.teams.some(
+    (team) => team.id === session.user.teamId
+  )
+    ? session.user.teamId
+    : null;
   const currentLocation = demographicOptions.locations.some(
     (location) => location.name === session.user.location
   )
@@ -46,6 +56,8 @@ export async function GET(
       demographicOptions: {
         ...demographicOptions,
         currentDepartmentId,
+        currentDivision,
+        currentTeamId,
         currentLocation,
       },
     },

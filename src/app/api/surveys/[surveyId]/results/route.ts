@@ -69,6 +69,7 @@ export async function GET(
         completions,
         sentiment: null,
         departmentBreakdown: [],
+        divisionBreakdown: [],
         teamBreakdown: [],
         locationBreakdown: [],
         filterOptions,
@@ -135,6 +136,7 @@ export async function GET(
   });
 
   const departmentBreakdown = await buildDepartmentBreakdown(surveyId, responseWhere, employeeWhere);
+  const divisionBreakdown = await buildDivisionBreakdown(surveyId, responseWhere, employeeWhere);
   const teamBreakdown = await buildTeamBreakdown(surveyId, responseWhere, employeeWhere);
   const locationBreakdown = await buildLocationBreakdown(surveyId, responseWhere, employeeWhere);
 
@@ -152,6 +154,7 @@ export async function GET(
       completions,
       sentiment: survey.sentimentAnalyses[0] || null,
       departmentBreakdown,
+      divisionBreakdown,
       teamBreakdown,
       locationBreakdown,
       filterOptions,
@@ -178,6 +181,7 @@ function getFilters(request: NextRequest): AccessFilters {
   const params = request.nextUrl.searchParams;
   return {
     departmentId: params.get("departmentId"),
+    division: params.get("division"),
     teamId: params.get("teamId"),
     location: params.get("location"),
   };
@@ -186,6 +190,7 @@ function getFilters(request: NextRequest): AccessFilters {
 function applyEmployeeFilters(where: Prisma.UserWhereInput, filters: AccessFilters) {
   const clauses: Prisma.UserWhereInput[] = [where];
   if (filters.departmentId) clauses.push({ departmentId: filters.departmentId });
+  if (filters.division) clauses.push({ division: filters.division });
   if (filters.teamId) clauses.push({ teamId: filters.teamId });
   if (filters.location) clauses.push({ location: filters.location });
   return clauses.length === 1 ? where : { AND: clauses };
@@ -197,6 +202,7 @@ async function getFilterOptions(user: Session["user"]) {
     where: employeeWhere,
     select: {
       location: true,
+      division: true,
       department: { select: { id: true, name: true } },
       team: { select: { id: true, name: true } },
     },
@@ -208,6 +214,7 @@ async function getFilterOptions(user: Session["user"]) {
       employees.map((employee) => employee.department).filter(Boolean),
       "id"
     ),
+    divisions: [...new Set(employees.map((employee) => employee.division).filter(Boolean))],
     teams: uniqueBy(
       employees
         .map((employee) => employee.team)
@@ -216,6 +223,36 @@ async function getFilterOptions(user: Session["user"]) {
     ),
     locations: [...new Set(employees.map((employee) => employee.location).filter(Boolean))],
   };
+}
+
+async function buildDivisionBreakdown(
+  surveyId: string,
+  responseWhere: Prisma.SurveyResponseWhereInput,
+  employeeWhere: Prisma.UserWhereInput
+) {
+  const divisions = await prisma.user.findMany({
+    where: { AND: [employeeWhere, { division: { not: null } }] },
+    distinct: ["division"],
+    select: { division: true },
+    orderBy: { division: "asc" },
+  });
+
+  return Promise.all(
+    divisions
+      .filter((row): row is { division: string } => Boolean(row.division))
+      .map(async ({ division }) => {
+        const scopedResponseWhere = {
+          AND: [responseWhere, { division }],
+        } satisfies Prisma.SurveyResponseWhereInput;
+        return buildBreakdownRow(
+          surveyId,
+          division,
+          division,
+          scopedResponseWhere,
+          { AND: [employeeWhere, { division }] }
+        );
+      })
+  );
 }
 
 async function buildDepartmentBreakdown(

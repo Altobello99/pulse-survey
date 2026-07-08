@@ -53,24 +53,48 @@ export async function POST(
   }
 
   const body = await request.json();
-  const { answers, departmentId, location } = body as {
+  const { answers, departmentId, division, teamId, location } = body as {
     answers?: SubmittedAnswer[];
     departmentId?: string | null;
+    division?: string | null;
+    teamId?: string | null;
     location?: string | null;
   };
   const demographicOptions = await getEligibleSurveyDemographics();
   const eligibleDepartmentIds = new Set(
     demographicOptions.departments.map((department) => department.id)
   );
+  const eligibleDivisions = new Set(
+    demographicOptions.divisions.map((option) => option.name)
+  );
+  const eligibleTeamIds = new Set(
+    demographicOptions.teams.map((team) => team.id)
+  );
   const eligibleLocations = new Set(
     demographicOptions.locations.map((option) => option.name)
   );
   const requestedDepartmentId = departmentId?.trim() || "";
+  const requestedDivision = division?.trim() || "";
+  const requestedTeamId = teamId?.trim() || "";
   const requestedLocation = location?.trim() || "";
 
   if (requestedDepartmentId && !eligibleDepartmentIds.has(requestedDepartmentId)) {
     return Response.json(
       { error: "That department is not available for this survey." },
+      { status: 400 }
+    );
+  }
+
+  if (requestedDivision && !eligibleDivisions.has(requestedDivision)) {
+    return Response.json(
+      { error: "That division is not available for this survey." },
+      { status: 400 }
+    );
+  }
+
+  if (requestedTeamId && !eligibleTeamIds.has(requestedTeamId)) {
+    return Response.json(
+      { error: "That shift/line is not available for this survey." },
       { status: 400 }
     );
   }
@@ -83,6 +107,12 @@ export async function POST(
   }
 
   const departmentEligibleFromBamboo = eligibleDepartmentIds.has(session.user.departmentId);
+  const divisionEligibleFromBamboo = session.user.division
+    ? eligibleDivisions.has(session.user.division)
+    : false;
+  const teamEligibleFromBamboo = session.user.teamId
+    ? eligibleTeamIds.has(session.user.teamId)
+    : false;
   const locationEligibleFromBamboo = session.user.location
     ? eligibleLocations.has(session.user.location)
     : false;
@@ -91,6 +121,10 @@ export async function POST(
     (departmentEligibleFromBamboo
       ? session.user.departmentId
       : await getAnonymousFallbackDepartmentId());
+  const safeDivision =
+    requestedDivision || (divisionEligibleFromBamboo ? session.user.division : null);
+  const safeTeamId =
+    requestedTeamId || (teamEligibleFromBamboo ? session.user.teamId : null);
   const safeLocation =
     requestedLocation || (locationEligibleFromBamboo ? session.user.location : null);
 
@@ -98,13 +132,6 @@ export async function POST(
   // correlated with login timestamps or auth logs to identify respondents.
   const fuzzedTime = new Date();
   fuzzedTime.setMinutes(0, 0, 0);
-
-  // Check team size - if below threshold, strip team ID to prevent identification
-  const { ANONYMITY_THRESHOLD } = await import("@/lib/constants");
-  const teamSize = session.user.teamId
-    ? await prisma.user.count({ where: { teamId: session.user.teamId } })
-    : 0;
-  const safeTeamId = teamSize >= ANONYMITY_THRESHOLD ? session.user.teamId : null;
 
   // Create anonymous response (no userId!)
   await prisma.$transaction([
@@ -115,7 +142,7 @@ export async function POST(
         teamId: safeTeamId,
         managerEmail: session.user.managerEmail,
         location: safeLocation,
-        division: session.user.division,
+        division: safeDivision,
         submittedAt: fuzzedTime,
         answers: {
           create: (answers || []).map((a) => ({

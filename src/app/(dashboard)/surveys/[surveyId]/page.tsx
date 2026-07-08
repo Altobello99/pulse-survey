@@ -23,8 +23,19 @@ interface Survey {
   questions: Question[];
   demographicOptions?: {
     departments: { id: string; name: string; employeeCount: number }[];
+    divisions: { name: string; employeeCount: number }[];
+    teams: {
+      id: string;
+      name: string;
+      departmentId: string;
+      departmentName: string;
+      employeeCount: number;
+      shiftLabel: string;
+    }[];
     locations: { name: string; employeeCount: number }[];
     currentDepartmentId: string | null;
+    currentDivision: string | null;
+    currentTeamId: string | null;
     currentLocation: string | null;
   };
 }
@@ -41,6 +52,8 @@ export default function TakeSurveyPage({ params }: { params: Promise<{ surveyId:
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [departmentId, setDepartmentId] = useState("");
+  const [division, setDivision] = useState("");
+  const [teamId, setTeamId] = useState("");
   const [location, setLocation] = useState("");
 
   useEffect(() => {
@@ -51,6 +64,8 @@ export default function TakeSurveyPage({ params }: { params: Promise<{ surveyId:
         if (d.data?.completed) setSubmitted(true);
         if (d.data?.demographicOptions) {
           setDepartmentId(d.data.demographicOptions.currentDepartmentId || "");
+          setDivision(d.data.demographicOptions.currentDivision || "");
+          setTeamId(d.data.demographicOptions.currentTeamId || "");
           setLocation(d.data.demographicOptions.currentLocation || "");
         }
       })
@@ -80,7 +95,7 @@ export default function TakeSurveyPage({ params }: { params: Promise<{ surveyId:
     const res = await fetch(`/api/surveys/${surveyId}/responses`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ answers: answerData, departmentId, location }),
+      body: JSON.stringify({ answers: answerData, departmentId, division, teamId, location }),
     });
 
     if (res.ok) {
@@ -208,10 +223,11 @@ export default function TakeSurveyPage({ params }: { params: Promise<{ surveyId:
           <section className="rounded-xl border border-slate-200 bg-slate-50 p-4">
             <div className="mb-4">
               <h2 className="text-sm font-semibold uppercase tracking-wide text-primary">
-                Department and Location
+                Department, Division, Shift and Location
               </h2>
               <p className="mt-1 text-sm text-slate-500">
-                Only departments and locations with 10 or more active employees are listed.
+                Options come from BambooHR and only groups with 10 or more active employees are listed.
+                Manager reporting is pulled from BambooHR automatically.
               </p>
             </div>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -221,7 +237,10 @@ export default function TakeSurveyPage({ params }: { params: Promise<{ surveyId:
                 </label>
                 <select
                   value={departmentId}
-                  onChange={(e) => setDepartmentId(e.target.value)}
+                  onChange={(e) => {
+                    setDepartmentId(e.target.value);
+                    setTeamId("");
+                  }}
                   className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary"
                 >
                   <option value="">My department is not listed</option>
@@ -230,6 +249,42 @@ export default function TakeSurveyPage({ params }: { params: Promise<{ surveyId:
                       {department.name}
                     </option>
                   ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-800 mb-1.5">
+                  Division
+                </label>
+                <select
+                  value={division}
+                  onChange={(e) => setDivision(e.target.value)}
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary"
+                >
+                  <option value="">My division is not listed</option>
+                  {(survey.demographicOptions?.divisions || []).map((option) => (
+                    <option key={option.name} value={option.name}>
+                      {option.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-800 mb-1.5">
+                  Shift / Line
+                </label>
+                <select
+                  value={teamId}
+                  onChange={(e) => setTeamId(e.target.value)}
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary"
+                >
+                  <option value="">My shift / line is not listed</option>
+                  {(survey.demographicOptions?.teams || [])
+                    .filter((team) => !departmentId || team.departmentId === departmentId)
+                    .map((team) => (
+                      <option key={team.id} value={team.id}>
+                        {team.shiftLabel}
+                      </option>
+                    ))}
                 </select>
               </div>
               <div>

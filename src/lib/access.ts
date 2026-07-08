@@ -11,6 +11,7 @@ export const ADMIN_EMAILS = new Set(
 
 export type AccessFilters = {
   departmentId?: string | null;
+  division?: string | null;
   teamId?: string | null;
   location?: string | null;
 };
@@ -44,6 +45,7 @@ export async function getManagerScope(user: SessionUser) {
       employeeEmails: [] as string[],
       managerEmails: [] as string[],
       departmentIds: [] as string[],
+      divisions: [] as string[],
       teamIds: [] as string[],
       locations: [] as string[],
     };
@@ -56,6 +58,7 @@ export async function getManagerScope(user: SessionUser) {
       email: true,
       managerEmail: true,
       departmentId: true,
+      division: true,
       teamId: true,
       location: true,
     },
@@ -95,6 +98,7 @@ export async function getManagerScope(user: SessionUser) {
     employeeEmails: scopedEmails,
     managerEmails: scopedManagerEmails,
     departmentIds: unique(scopedEmployees.map((employee) => employee.departmentId)),
+    divisions: unique(scopedEmployees.map((employee) => employee.division).filter((division): division is string => Boolean(division))),
     teamIds: unique(scopedEmployees.map((employee) => employee.teamId).filter((id): id is string => Boolean(id))),
     locations: unique(scopedEmployees.map((employee) => employee.location).filter((location): location is string => Boolean(location))),
   };
@@ -133,6 +137,9 @@ export async function getScopedResponseWhere(
   if (scope.teamIds.length > 0) {
     scopeOr.push({ teamId: { in: scope.teamIds } });
   }
+  if (scope.divisions.length > 0) {
+    scopeOr.push({ division: { in: scope.divisions } });
+  }
   if (scope.locations.length > 0) {
     scopeOr.push({ location: { in: scope.locations } });
   }
@@ -146,6 +153,7 @@ function applyFilters(where: Prisma.SurveyResponseWhereInput, filters: AccessFil
   const clauses: Prisma.SurveyResponseWhereInput[] = [where];
 
   if (filters.departmentId) clauses.push({ departmentId: filters.departmentId });
+  if (filters.division) clauses.push({ division: filters.division });
   if (filters.teamId) clauses.push({ teamId: filters.teamId });
   if (filters.location) clauses.push({ location: filters.location });
 

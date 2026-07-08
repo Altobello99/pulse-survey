@@ -43,7 +43,7 @@ type ReportContext = {
   reportType: ReportType;
   reportLabel: string;
   survey: SurveyForReport;
-  filters: { departmentId?: string | null; teamId?: string | null; location?: string | null };
+  filters: { departmentId?: string | null; division?: string | null; teamId?: string | null; location?: string | null };
   scope: "company" | "filtered";
   scopeLabel: string;
   generatedAt: Date;
@@ -118,6 +118,7 @@ async function buildReportContext(
       ? {}
       : {
           departmentId: request.nextUrl.searchParams.get("departmentId"),
+          division: request.nextUrl.searchParams.get("division"),
           teamId: request.nextUrl.searchParams.get("teamId"),
           location: request.nextUrl.searchParams.get("location"),
         };
@@ -223,7 +224,8 @@ function buildParticipationReport(context: ReportContext): ReportSheet[] {
   return [
     { name: "Summary", rows: [...summaryRows(context), [], ...participationSummaryRows(context)] },
     { name: "By Department", rows: breakdownRows(context, "department") },
-    { name: "By Team", rows: breakdownRows(context, "team") },
+    { name: "By Division", rows: breakdownRows(context, "division") },
+    { name: "By Shift Line", rows: breakdownRows(context, "team") },
     { name: "By Location", rows: breakdownRows(context, "location") },
     { name: "Charts", rows: chartRows(participationChartData(context)) },
   ];
@@ -308,9 +310,10 @@ function buildDepartmentBreakdownReport(context: ReportContext): ReportSheet[] {
 function buildTeamLocationReport(context: ReportContext): ReportSheet[] {
   return [
     { name: "Summary", rows: summaryRows(context) },
-    { name: "Team Breakdown", rows: breakdownRows(context, "team") },
+    { name: "Division Breakdown", rows: breakdownRows(context, "division") },
+    { name: "Shift Line Breakdown", rows: breakdownRows(context, "team") },
     { name: "Location Breakdown", rows: breakdownRows(context, "location") },
-    { name: "Charts", rows: chartRows([...breakdownChartData(context, "team"), ...breakdownChartData(context, "location")]) },
+    { name: "Charts", rows: chartRows([...breakdownChartData(context, "division"), ...breakdownChartData(context, "team"), ...breakdownChartData(context, "location")]) },
   ];
 }
 
@@ -398,7 +401,8 @@ function buildCompletionTrackerReport(context: ReportContext): ReportSheet[] {
     { name: "Summary", rows: [...summaryRows(context), [], ...completionSummaryRows(context)] },
     { name: "Employee Completion", rows: employeeCompletionRows(context, false) },
     { name: "By Department", rows: completionGroupRows(context, "department") },
-    { name: "By Team", rows: completionGroupRows(context, "team") },
+    { name: "By Division", rows: completionGroupRows(context, "division") },
+    { name: "By Shift Line", rows: completionGroupRows(context, "team") },
     { name: "By Location", rows: completionGroupRows(context, "location") },
     { name: "Charts", rows: chartRows(completionChartData(context)) },
   ];
@@ -409,7 +413,8 @@ function buildNonCompletionReport(context: ReportContext): ReportSheet[] {
     { name: "Summary", rows: [...summaryRows(context), [], ...completionSummaryRows(context)] },
     { name: "Non-Completed Employees", rows: employeeCompletionRows(context, true) },
     { name: "By Department", rows: completionGroupRows(context, "department") },
-    { name: "By Team", rows: completionGroupRows(context, "team") },
+    { name: "By Division", rows: completionGroupRows(context, "division") },
+    { name: "By Shift Line", rows: completionGroupRows(context, "team") },
     { name: "By Location", rows: completionGroupRows(context, "location") },
   ];
 }
@@ -450,7 +455,7 @@ function completionSummaryRows(context: ReportContext): CellValue[][] {
   ];
 }
 
-function breakdownRows(context: ReportContext, groupBy: "department" | "team" | "location"): CellValue[][] {
+function breakdownRows(context: ReportContext, groupBy: "department" | "division" | "team" | "location"): CellValue[][] {
   const rows: CellValue[][] = [
     ...summaryRows(context),
     [],
@@ -478,7 +483,7 @@ function employeeCompletionRows(context: ReportContext, incompleteOnly: boolean)
   const rows: CellValue[][] = [
     ...summaryRows(context),
     [],
-    ["Name", "Email", "Department", "Team", "Location", "Manager Email", "Status", "Completed", "Completed At"],
+    ["Name", "Email", "Department", "Division", "Shift / Line", "Location", "Manager Email", "Status", "Completed", "Completed At"],
   ];
 
   for (const employee of context.employees) {
@@ -488,6 +493,7 @@ function employeeCompletionRows(context: ReportContext, incompleteOnly: boolean)
       employee.name,
       employee.email,
       employee.department?.name || "",
+      employee.division || "",
       employee.team?.name || "",
       employee.location || "",
       employee.managerEmail || "",
@@ -498,13 +504,13 @@ function employeeCompletionRows(context: ReportContext, incompleteOnly: boolean)
   }
 
   if (rows.length === summaryRows(context).length + 2) {
-    rows.push(["No employees found", "", "", "", "", "", "", "", ""]);
+    rows.push(["No employees found", "", "", "", "", "", "", "", "", ""]);
   }
 
   return rows;
 }
 
-function completionGroupRows(context: ReportContext, groupBy: "department" | "team" | "location"): CellValue[][] {
+function completionGroupRows(context: ReportContext, groupBy: "department" | "division" | "team" | "location"): CellValue[][] {
   const completed = new Set(context.completions.map((completion) => completion.userId));
   const groups = groupEmployees(context, groupBy);
   const rows: CellValue[][] = [
@@ -545,7 +551,7 @@ function getOverallMetrics(context: ReportContext) {
   };
 }
 
-function groupSurveyData(context: ReportContext, groupBy: "department" | "team" | "location") {
+function groupSurveyData(context: ReportContext, groupBy: "department" | "division" | "team" | "location") {
   return groupEmployees(context, groupBy).map((group) => {
     const employeeIds = new Set(group.employees.map((employee) => employee.id));
     return {
@@ -553,6 +559,7 @@ function groupSurveyData(context: ReportContext, groupBy: "department" | "team" 
       completions: context.completions.filter((completion) => employeeIds.has(completion.userId)),
       responses: context.responses.filter((response) => {
         if (groupBy === "department") return response.departmentId === group.id;
+        if (groupBy === "division") return (response.division || "Unassigned") === group.id;
         if (groupBy === "team") return response.teamId === group.id;
         return (response.location || "Unassigned") === group.id;
       }),
@@ -560,22 +567,26 @@ function groupSurveyData(context: ReportContext, groupBy: "department" | "team" 
   });
 }
 
-function groupEmployees(context: ReportContext, groupBy: "department" | "team" | "location") {
+function groupEmployees(context: ReportContext, groupBy: "department" | "division" | "team" | "location") {
   const groups = new Map<string, { id: string; name: string; employees: typeof context.employees }>();
 
   for (const employee of context.employees) {
     const id =
       groupBy === "department"
         ? employee.departmentId
-        : groupBy === "team"
-          ? employee.teamId || "Unassigned"
-          : employee.location || "Unassigned";
+        : groupBy === "division"
+          ? employee.division || "Unassigned"
+          : groupBy === "team"
+            ? employee.teamId || "Unassigned"
+            : employee.location || "Unassigned";
     const name =
       groupBy === "department"
         ? employee.department?.name || "Unassigned"
-        : groupBy === "team"
-          ? employee.team?.name || "Unassigned"
-          : employee.location || "Unassigned";
+        : groupBy === "division"
+          ? employee.division || "Unassigned"
+          : groupBy === "team"
+            ? employee.team?.name || "Unassigned"
+            : employee.location || "Unassigned";
 
     const group = groups.get(id) || { id, name, employees: [] as typeof context.employees };
     group.employees.push(employee);
@@ -591,7 +602,7 @@ function participationChartData(context: ReportContext): [string, number][] {
     .map((group) => [group.name, Math.round((group.completions.length / group.employees.length) * 100)]);
 }
 
-function breakdownChartData(context: ReportContext, groupBy: "department" | "team" | "location"): [string, number][] {
+function breakdownChartData(context: ReportContext, groupBy: "department" | "division" | "team" | "location"): [string, number][] {
   return groupSurveyData(context, groupBy)
     .filter((group) => group.responses.length >= ANONYMITY_THRESHOLD)
     .map((group) => [group.name, average(ratingValues(group.responses))]);
@@ -643,17 +654,19 @@ function textAnswers(answers: ReturnType<typeof answersForQuestion>) {
     .filter((value): value is string => Boolean(value && value.trim()));
 }
 
-function applyResponseFilters(where: Prisma.SurveyResponseWhereInput, filters: { departmentId?: string | null; teamId?: string | null; location?: string | null }) {
+function applyResponseFilters(where: Prisma.SurveyResponseWhereInput, filters: { departmentId?: string | null; division?: string | null; teamId?: string | null; location?: string | null }) {
   const clauses: Prisma.SurveyResponseWhereInput[] = [where];
   if (filters.departmentId) clauses.push({ departmentId: filters.departmentId });
+  if (filters.division) clauses.push({ division: filters.division });
   if (filters.teamId) clauses.push({ teamId: filters.teamId });
   if (filters.location) clauses.push({ location: filters.location });
   return clauses.length === 1 ? where : { AND: clauses };
 }
 
-function applyEmployeeFilters(where: Prisma.UserWhereInput, filters: { departmentId?: string | null; teamId?: string | null; location?: string | null }) {
+function applyEmployeeFilters(where: Prisma.UserWhereInput, filters: { departmentId?: string | null; division?: string | null; teamId?: string | null; location?: string | null }) {
   const clauses: Prisma.UserWhereInput[] = [where];
   if (filters.departmentId) clauses.push({ departmentId: filters.departmentId });
+  if (filters.division) clauses.push({ division: filters.division });
   if (filters.teamId) clauses.push({ teamId: filters.teamId });
   if (filters.location) clauses.push({ location: filters.location });
   return clauses.length === 1 ? where : { AND: clauses };
@@ -704,10 +717,11 @@ function makeFilename(surveyTitle: string, reportType: ReportType, format: "xlsx
   return `${surveyTitle}_${reportType}`.replace(/[^a-z0-9]+/gi, "_").replace(/^_+|_+$/g, "").toLowerCase() + `.${format}`;
 }
 
-function buildScopeLabel(scope: string, filters: { departmentId?: string | null; teamId?: string | null; location?: string | null }) {
+function buildScopeLabel(scope: string, filters: { departmentId?: string | null; division?: string | null; teamId?: string | null; location?: string | null }) {
   if (scope === "company") return "Company-wide";
   const parts = [
     filters.departmentId ? `Department ${filters.departmentId}` : "",
+    filters.division ? `Division ${filters.division}` : "",
     filters.teamId ? `Team ${filters.teamId}` : "",
     filters.location ? `Location ${filters.location}` : "",
   ].filter(Boolean);
