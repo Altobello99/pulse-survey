@@ -18,9 +18,14 @@ export type AccessFilters = {
 
 type SessionUser = Session["user"];
 
+const employeeEmailDomain = (
+  process.env.GOOGLE_HOSTED_DOMAIN?.trim().toLowerCase() || "clutch.ca"
+).replace(/^@/, "");
+
 export const activeBambooEmployeeWhere = {
   status: "active",
   bambooHrId: { not: null },
+  email: { endsWith: `@${employeeEmailDomain}` },
 } satisfies Prisma.UserWhereInput;
 
 export const departmentedBambooEmployeeWhere = {
