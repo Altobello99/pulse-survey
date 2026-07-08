@@ -25,6 +25,7 @@ type BambooEmployee = {
   supervisor?: string | null;
   supervisorEmail?: string | null;
   reportsTo?: string | null;
+  status?: string | null;
   employmentStatus?: string | null;
   hireDate?: string | null;
 };
@@ -75,6 +76,7 @@ const baseFields = [
   "supervisor",
   "supervisorEmail",
   "reportsTo",
+  "status",
   "employmentStatus",
   "hireDate",
   "employeeNumber",
@@ -93,7 +95,7 @@ export async function syncBambooEmployees(): Promise<BambooSyncResult> {
   const normalized = employees
     .map((employee) => normalizeEmployee(employee, syncSource.teamFieldKeys))
     .filter((employee): employee is ReturnType<typeof normalizeEmployee> & { email: string } => Boolean(employee.email))
-    .filter((employee) => isActiveEmploymentStatus(employee.employmentStatus));
+    .filter((employee) => isActiveBambooEmployee(employee.status, employee.employmentStatus));
 
   const seenEmails = new Set(normalized.map((employee) => employee.email));
   const managerEmails = new Set(
@@ -308,6 +310,7 @@ function normalizeEmployee(employee: BambooEmployee, teamFieldKeys: string[]) {
     bambooHrId: employee.employeeId || employee.id || null,
     employeeNumber: employee.employeeNumber || null,
     jobTitle: employee.jobTitle || null,
+    status: employee.status || null,
     employmentStatus: employee.employmentStatus || null,
     department: employee.department || "Unassigned",
     division: employee.division || null,
@@ -334,10 +337,16 @@ function parseBambooDate(value: string | null | undefined) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
-function isActiveEmploymentStatus(status: string | null | undefined) {
-  const normalized = (status || "").trim().toLowerCase();
-  if (!normalized) return true;
-  return !["inactive", "terminated", "deceased"].includes(normalized);
+function isActiveBambooEmployee(
+  status: string | null | undefined,
+  employmentStatus: string | null | undefined
+) {
+  const normalizedStatus = (status || "").trim().toLowerCase();
+  if (normalizedStatus) return normalizedStatus === "active";
+
+  const normalizedEmploymentStatus = (employmentStatus || "").trim().toLowerCase();
+  if (!normalizedEmploymentStatus) return true;
+  return !["inactive", "terminated", "deceased"].includes(normalizedEmploymentStatus);
 }
 
 function extractEmail(value: string | null | undefined) {
