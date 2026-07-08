@@ -113,12 +113,13 @@ export async function syncBambooEmployees(): Promise<BambooSyncResult> {
       update: {},
     });
 
-    const teamName = employee.team || employee.division || employee.location || employee.department;
-    const team = await prisma.team.upsert({
-      where: { name_departmentId: { name: teamName, departmentId: department.id } },
-      create: { name: teamName, departmentId: department.id },
-      update: {},
-    });
+    const team = employee.team
+      ? await prisma.team.upsert({
+          where: { name_departmentId: { name: employee.team, departmentId: department.id } },
+          create: { name: employee.team, departmentId: department.id },
+          update: {},
+        })
+      : null;
 
     const role = isAdminEmail(employee.email)
       ? "admin"
@@ -148,7 +149,7 @@ export async function syncBambooEmployees(): Promise<BambooSyncResult> {
         division: employee.division,
         bambooSyncedAt: now,
         departmentId: department.id,
-        teamId: team.id,
+        teamId: team?.id || null,
       },
       update: {
         name: employee.name,
@@ -163,7 +164,7 @@ export async function syncBambooEmployees(): Promise<BambooSyncResult> {
         division: employee.division,
         bambooSyncedAt: now,
         departmentId: department.id,
-        teamId: team.id,
+        teamId: team?.id || null,
         ...(role === "admin" && !existing ? { passwordHash: adminHash } : {}),
       },
     });
