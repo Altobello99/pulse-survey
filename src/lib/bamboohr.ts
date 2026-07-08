@@ -255,8 +255,14 @@ function normalizeEmployee(employee: BambooEmployee) {
     division: employee.division || null,
     location: employee.location || null,
     managerEmail,
-    hireDate: employee.hireDate ? new Date(employee.hireDate) : null,
+    hireDate: parseBambooDate(employee.hireDate),
   };
+}
+
+function parseBambooDate(value: string | null | undefined) {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
 }
 
 function isActiveEmploymentStatus(status: string | null | undefined) {
