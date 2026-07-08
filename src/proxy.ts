@@ -23,7 +23,7 @@ export async function proxy(request: NextRequest) {
       return NextResponse.redirect(new URL("/dashboard", request.url));
     }
     const response = NextResponse.next();
-    if (pathname === "/login" || pathname === "/reset-cache") {
+    if (pathname === "/login" || pathname === "/reset-cache" || pathname === "/manifest.json" || pathname === "/sw.js") {
       response.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
       response.headers.set("Pragma", "no-cache");
       response.headers.set("Expires", "0");
