@@ -201,12 +201,12 @@ async function fetchActiveEmployees(companyDomain: string, apiKey: string) {
 
   try {
     return {
-      employees: await fetchEmployeesFromListEndpoint(companyDomain, apiKey, fields),
+      employees: await fetchEmployeesFromCustomReport(companyDomain, apiKey, fields),
       teamFieldKeys,
     };
   } catch {
     return {
-      employees: await fetchEmployeesFromCustomReport(companyDomain, apiKey, fields),
+      employees: await fetchEmployeesFromListEndpoint(companyDomain, apiKey, fields),
       teamFieldKeys,
     };
   }
