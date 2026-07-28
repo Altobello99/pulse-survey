@@ -106,7 +106,7 @@ export default function AdminDashboard() {
       {/* Stat Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: "Total Employees", value: stats?.totalEmployees ?? 0, color: "text-slate-900" },
+          { label: "Eligible Employees", value: stats?.totalEmployees ?? 0, color: "text-slate-900" },
           { label: "Active Surveys", value: stats?.activeSurveys ?? 0, color: "text-primary" },
           { label: "Avg Participation", value: `${stats?.avgParticipation ?? 0}%`, color: "text-secondary" },
           {
