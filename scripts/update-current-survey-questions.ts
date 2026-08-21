@@ -86,6 +86,12 @@ const questions: QuestionInput[] = [
     type: "free_text",
     required: false,
   },
+  {
+    section: "Ending Questions",
+    text: "What is one idea or opportunity Clutch should consider to improve how we operate, serve our customers, or achieve better business results?",
+    type: "free_text",
+    required: false,
+  },
 ];
 
 async function main() {
