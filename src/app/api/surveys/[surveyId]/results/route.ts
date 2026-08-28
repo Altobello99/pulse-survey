@@ -55,8 +55,7 @@ export async function GET(
   });
 
   const filterOptions = await getFilterOptions(session.user);
-  const canShowDetailedResults =
-    session.user.role === "admin" || responses.length >= ANONYMITY_THRESHOLD;
+  const canShowDetailedResults = responses.length >= ANONYMITY_THRESHOLD;
 
   if (!canShowDetailedResults) {
     return Response.json({

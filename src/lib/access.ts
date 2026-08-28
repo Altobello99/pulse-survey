@@ -148,24 +148,15 @@ export async function getScopedResponseWhere(
   }
 
   const scope = await getManagerScope(user);
-  const scopeOr: Prisma.SurveyResponseWhereInput[] = [];
+  if (scope.managerEmails.length === 0) return { surveyId, id: "__none__" };
 
-  if (scope.managerEmails.length > 0) {
-    scopeOr.push({ managerEmail: { in: scope.managerEmails } });
-  }
-  if (scope.teamIds.length > 0) {
-    scopeOr.push({ teamId: { in: scope.teamIds } });
-  }
-  if (scope.divisions.length > 0) {
-    scopeOr.push({ division: { in: scope.divisions } });
-  }
-  if (scope.locations.length > 0) {
-    scopeOr.push({ location: { in: scope.locations } });
-  }
-
-  if (scopeOr.length === 0) return { surveyId, id: "__none__" };
-
-  return applyFilters({ AND: [base, { OR: scopeOr }] }, filters);
+  // Responses store only the respondent's BambooHR manager email. Including
+  // each manager in the reporting tree covers direct and indirect reports
+  // without widening access to unrelated employees who share demographics.
+  return applyFilters(
+    { AND: [base, { managerEmail: { in: scope.managerEmails } }] },
+    filters
+  );
 }
 
 function applyFilters(where: Prisma.SurveyResponseWhereInput, filters: AccessFilters) {

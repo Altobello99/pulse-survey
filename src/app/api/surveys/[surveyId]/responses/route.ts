@@ -15,6 +15,13 @@ type SubmittedAnswer = {
   textValue?: string | null;
 };
 
+type SurveyQuestion = {
+  id: string;
+  type: string;
+  required: boolean;
+  options: string | null;
+};
+
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ surveyId: string }> }
@@ -59,7 +66,10 @@ export async function POST(
   }
 
   // Check survey is active
-  const survey = await prisma.survey.findUnique({ where: { id: surveyId } });
+  const survey = await prisma.survey.findUnique({
+    where: { id: surveyId },
+    include: { questions: { orderBy: { order: "asc" } } },
+  });
   const now = new Date();
   if (
     !survey ||
@@ -70,14 +80,21 @@ export async function POST(
     return Response.json({ error: "Survey not available" }, { status: 400 });
   }
 
-  const body = await request.json();
-  const { answers, departmentId, division, teamId, location } = body as {
-    answers?: SubmittedAnswer[];
+  const body = (await request.json().catch(() => null)) as {
+    answers?: unknown[];
     departmentId?: string | null;
     division?: string | null;
     teamId?: string | null;
     location?: string | null;
-  };
+  } | null;
+  if (!body) return Response.json({ error: "Invalid request body" }, { status: 400 });
+
+  const { departmentId, division, teamId, location } = body;
+  const answerValidation = validateAnswers(survey.questions, body.answers);
+  if (answerValidation.error) {
+    return Response.json({ error: answerValidation.error }, { status: 400 });
+  }
+
   const demographicOptions = await getEligibleSurveyDemographics();
   const eligibleDepartmentIds = new Set(
     demographicOptions.departments.map((department) => department.id)
@@ -163,7 +180,7 @@ export async function POST(
         division: safeDivision,
         submittedAt: fuzzedTime,
         answers: {
-          create: (answers || []).map((a) => ({
+          create: answerValidation.answers.map((a) => ({
             questionId: a.questionId,
             ratingValue: a.ratingValue ?? null,
             choiceValue: a.choiceValue ?? null,
@@ -197,4 +214,83 @@ export async function GET(
   });
 
   return Response.json({ data: responses });
+}
+
+function validateAnswers(questions: SurveyQuestion[], submitted: unknown[] | undefined) {
+  const questionById = new Map(questions.map((question) => [question.id, question]));
+  const answeredQuestionIds = new Set<string>();
+  const answers: SubmittedAnswer[] = [];
+
+  for (const item of submitted || []) {
+    if (!item || typeof item !== "object") {
+      return { answers: [], error: "Invalid survey answer" };
+    }
+
+    const raw = item as Partial<SubmittedAnswer>;
+    if (typeof raw.questionId !== "string") {
+      return { answers: [], error: "Invalid survey answer" };
+    }
+
+    const question = questionById.get(raw.questionId);
+    if (!question) {
+      return { answers: [], error: "An answer does not belong to this survey" };
+    }
+    if (answeredQuestionIds.has(question.id)) {
+      return { answers: [], error: "A question was answered more than once" };
+    }
+
+    if (question.type === "rating") {
+      if (raw.ratingValue === null || raw.ratingValue === undefined) continue;
+      if (!Number.isInteger(raw.ratingValue) || !ratingOptions(question).includes(raw.ratingValue)) {
+        return { answers: [], error: "A rating is outside the allowed scale" };
+      }
+      answers.push({ questionId: question.id, ratingValue: raw.ratingValue });
+    } else if (question.type === "multiple_choice") {
+      if (raw.choiceValue === null || raw.choiceValue === undefined || raw.choiceValue === "") continue;
+      if (
+        typeof raw.choiceValue !== "string" ||
+        !choiceOptions(question).includes(raw.choiceValue)
+      ) {
+        return { answers: [], error: "A selected answer is not an available option" };
+      }
+      answers.push({ questionId: question.id, choiceValue: raw.choiceValue });
+    } else if (question.type === "free_text") {
+      if (raw.textValue === null || raw.textValue === undefined) continue;
+      if (typeof raw.textValue !== "string") {
+        return { answers: [], error: "Invalid written response" };
+      }
+      if (raw.textValue.trim() === "") continue;
+      if (raw.textValue.length > 5000) {
+        return { answers: [], error: "A written response is too long" };
+      }
+      answers.push({ questionId: question.id, textValue: raw.textValue.trim() });
+    } else {
+      return { answers: [], error: "Unsupported survey question type" };
+    }
+
+    answeredQuestionIds.add(question.id);
+  }
+
+  if (questions.some((question) => question.required && !answeredQuestionIds.has(question.id))) {
+    return { answers: [], error: "Please answer all required questions" };
+  }
+
+  return { answers, error: null };
+}
+
+function choiceOptions(question: SurveyQuestion) {
+  if (!question.options) return [];
+  try {
+    const parsed = JSON.parse(question.options);
+    return Array.isArray(parsed) ? parsed.map(String) : [];
+  } catch {
+    return [];
+  }
+}
+
+function ratingOptions(question: SurveyQuestion) {
+  const values = choiceOptions(question)
+    .map(Number)
+    .filter((value) => Number.isInteger(value));
+  return values.length ? values : [1, 2, 3, 4, 5];
 }

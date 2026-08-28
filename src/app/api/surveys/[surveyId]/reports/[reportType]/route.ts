@@ -200,6 +200,8 @@ function buildReportSheets(context: ReportContext, reportType: ReportType): Repo
 
 function buildExecutiveSummary(context: ReportContext): ReportSheet[] {
   const metrics = getOverallMetrics(context);
+  const reportable = hasReportableResults(context);
+  const suppression = `Suppressed until at least ${ANONYMITY_THRESHOLD} responses`;
   const rows = [
     ...summaryRows(context),
     [],
@@ -208,16 +210,19 @@ function buildExecutiveSummary(context: ReportContext): ReportSheet[] {
     ["Completed surveys", metrics.completions],
     ["Anonymous responses", metrics.responses],
     ["Participation rate", `${metrics.participationRate}%`],
-    ["Overall average rating", metrics.averageRating || "No ratings yet"],
-    ["Open written comments", metrics.comments],
+    ["Overall average rating", reportable ? metrics.averageRating || "No ratings yet" : suppression],
+    ["Open written comments", reportable ? metrics.comments : suppression],
     [],
-    ["AI sentiment", context.survey.sentimentAnalyses[0]?.sentiment || "Not analyzed"],
-    ["AI summary", context.survey.sentimentAnalyses[0]?.summary || "Run AI analysis from the results page."],
+    ["AI sentiment", reportable ? context.survey.sentimentAnalyses[0]?.sentiment || "Not analyzed" : suppression],
+    ["AI summary", reportable ? context.survey.sentimentAnalyses[0]?.summary || "Run AI analysis from the results page." : suppression],
   ];
+
+  const chartData: [string, number][] = [["Participation rate", metrics.participationRate]];
+  if (reportable) chartData.push(["Average rating x20", metrics.averageRating * 20]);
 
   return [
     { name: "Executive Summary", rows },
-    { name: "Charts", rows: chartRows([["Participation rate", metrics.participationRate], ["Average rating x20", metrics.averageRating * 20]]) },
+    { name: "Charts", rows: chartRows(chartData) },
   ];
 }
 
@@ -233,6 +238,20 @@ function buildParticipationReport(context: ReportContext): ReportSheet[] {
 }
 
 function buildQuestionResultsReport(context: ReportContext): ReportSheet[] {
+  if (!hasReportableResults(context)) {
+    return [
+      {
+        name: "Question Results",
+        rows: [
+          ...summaryRows(context),
+          [],
+          [`Question results are suppressed until at least ${ANONYMITY_THRESHOLD} people respond.`],
+        ],
+      },
+      { name: "Charts", rows: chartRows([]) },
+    ];
+  }
+
   const rows: CellValue[][] = [
     ...summaryRows(context),
     [],
@@ -363,6 +382,18 @@ function buildManagerScopedReport(context: ReportContext): ReportSheet[] {
 }
 
 function buildCommentsThemesReport(context: ReportContext): ReportSheet[] {
+  if (!hasReportableResults(context)) {
+    const rows: CellValue[][] = [
+      ...summaryRows(context),
+      [],
+      [`Comments and themes are suppressed until at least ${ANONYMITY_THRESHOLD} people respond.`],
+    ];
+    return [
+      { name: "Grouped Themes", rows },
+      { name: "Raw Comments", rows },
+    ];
+  }
+
   const themeRows: CellValue[][] = [
     ...summaryRows(context),
     [],
@@ -429,7 +460,7 @@ function summaryRows(context: ReportContext): CellValue[][] {
     ["End Date", formatDate(context.survey.endDate)],
     ["Scope", context.scopeLabel],
     ["Generated At", formatDateTime(context.generatedAt)],
-    ["Anonymity Rule", `Breakdowns with fewer than ${ANONYMITY_THRESHOLD} responses are suppressed.`],
+    ["Anonymity Rule", `Survey results and breakdowns with fewer than ${ANONYMITY_THRESHOLD} responses are suppressed for every role.`],
   ];
 }
 
@@ -610,6 +641,8 @@ function breakdownChartData(context: ReportContext, groupBy: "department" | "div
 }
 
 function questionChartData(context: ReportContext): [string, number][] {
+  if (!hasReportableResults(context)) return [];
+
   return context.survey.questions
     .filter((question) => question.type === "rating")
     .map((question) => {
@@ -734,12 +767,29 @@ function average(values: number[]) {
   return Math.round((values.reduce((sum, value) => sum + value, 0) / values.length) * 10) / 10;
 }
 
+function hasReportableResults(context: ReportContext) {
+  return context.responses.length >= ANONYMITY_THRESHOLD;
+}
+
 function formatDate(value: Date) {
-  return value.toISOString().slice(0, 10);
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Toronto",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(value);
 }
 
 function formatDateTime(value: Date) {
-  return value.toISOString().replace("T", " ").slice(0, 16);
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Toronto",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).format(value);
 }
 
 function normalizeEmail(value: string | null | undefined) {
