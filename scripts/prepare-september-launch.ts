@@ -8,10 +8,10 @@ const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
 const surveyTitle = "Employee Pulse Survey";
-// Prisma writes these values to PostgreSQL timestamp columns using their UTC
-// clock fields; they are then interpreted by the app in America/Toronto.
-const launchStart = new Date("2026-09-01T00:00:00.000Z");
-const launchEnd = new Date("2026-09-18T23:59:59.999Z");
+// September falls in Eastern Daylight Time (UTC-4). These UTC instants render
+// as the requested Toronto start and end times throughout the application.
+const launchStart = new Date("2026-09-01T04:00:00.000Z");
+const launchEnd = new Date("2026-09-19T03:59:59.999Z");
 const demoCutoff = new Date("2026-06-01T00:00:00.000Z");
 
 const demoFeedbackMessages = [
@@ -66,7 +66,7 @@ async function main() {
     throw new Error(`Expected 0 or ${demoActionTitles.length} demo action records, found ${actionCount}.`);
   }
 
-  const [, deletedFeedback, deletedActions] = await prisma.$transaction([
+  const [updatedSurvey, deletedFeedback, deletedActions] = await prisma.$transaction([
     prisma.survey.update({
       where: { id: survey.id },
       data: {
@@ -79,7 +79,13 @@ async function main() {
     prisma.actionItem.deleteMany({ where: demoActionsWhere }),
   ]);
 
-  console.log(`Prepared ${surveyTitle} for September 1-18, 2026 (America/Toronto).`);
+  const torontoDateTime = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Toronto",
+    dateStyle: "full",
+    timeStyle: "long",
+  });
+  console.log(`Launch start: ${torontoDateTime.format(updatedSurvey.startDate)}`);
+  console.log(`Launch end: ${torontoDateTime.format(updatedSurvey.endDate)}`);
   console.log(`Removed ${deletedFeedback.count} demo feedback records.`);
   console.log(`Removed ${deletedActions.count} demo action records.`);
 }
