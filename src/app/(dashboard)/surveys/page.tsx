@@ -74,8 +74,9 @@ export default function SurveysPage() {
       ) : (
         <div className="grid gap-4">
           {surveys.map((survey) => {
+            const scheduled = isScheduled(survey);
             const closed = isClosed(survey);
-            const canTake = !survey.completed && !closed && !isAdminPortal;
+            const canTake = !survey.completed && !scheduled && !closed && !isAdminPortal;
 
             return (
               <div
@@ -90,14 +91,16 @@ export default function SurveysPage() {
                       </h2>
                       <span
                         className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                          survey.status === "active"
+                          survey.status === "active" && scheduled
+                            ? "bg-amber-50 text-amber-700"
+                            : survey.status === "active"
                             ? "bg-emerald-50 text-emerald-700"
                             : survey.status === "closed"
                             ? "bg-slate-100 text-slate-600"
                             : "bg-amber-50 text-amber-700"
                         }`}
                       >
-                        {survey.status}
+                        {scheduled ? "scheduled" : survey.status}
                       </span>
                       {survey.completed && (
                         <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700">
@@ -128,6 +131,11 @@ export default function SurveysPage() {
                       >
                         Take Survey
                       </Link>
+                    )}
+                    {!survey.completed && scheduled && (
+                      <span className="px-4 py-2 bg-amber-50 text-amber-700 text-sm font-medium rounded-lg">
+                        Opens Sep 1
+                      </span>
                     )}
                     {!survey.completed && closed && (
                       <Link
@@ -163,4 +171,8 @@ export default function SurveysPage() {
 
 function isClosed(survey: Survey) {
   return survey.status !== "active" || new Date(survey.endDate) < new Date();
+}
+
+function isScheduled(survey: Survey) {
+  return survey.status === "active" && new Date(survey.startDate) > new Date();
 }
