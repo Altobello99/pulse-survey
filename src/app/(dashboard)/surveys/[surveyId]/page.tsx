@@ -209,6 +209,14 @@ export default function TakeSurveyPage({ params }: { params: Promise<{ surveyId:
     );
   }
 
+  const availableTeams = (survey.demographicOptions?.teams || [])
+    .filter((team) => team.departmentId === departmentId)
+    .sort((a, b) => Number(b.id === teamId) - Number(a.id === teamId))
+    .filter(
+      (team, index, teams) =>
+        teams.findIndex((candidate) => candidate.shiftLabel === team.shiftLabel) === index
+    );
+
   return (
     <div className="max-w-2xl mx-auto">
       <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
@@ -300,16 +308,17 @@ export default function TakeSurveyPage({ params }: { params: Promise<{ surveyId:
                 <select
                   value={teamId}
                   onChange={(e) => setTeamId(e.target.value)}
+                  disabled={!departmentId}
                   className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary"
                 >
-                  <option value="">My shift / line is not listed</option>
-                  {(survey.demographicOptions?.teams || [])
-                    .filter((team) => !departmentId || team.departmentId === departmentId)
-                    .map((team) => (
-                      <option key={team.id} value={team.id}>
-                        {team.shiftLabel}
-                      </option>
-                    ))}
+                  <option value="">
+                    {departmentId ? "My shift / line is not listed" : "Select a department first"}
+                  </option>
+                  {availableTeams.map((team) => (
+                    <option key={team.id} value={team.id}>
+                      {team.shiftLabel}
+                    </option>
+                  ))}
                 </select>
               </div>
               <div>
