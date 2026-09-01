@@ -243,11 +243,14 @@ export default function TakeSurveyPage({ params }: { params: Promise<{ surveyId:
             </div>
             <div>
               <h3 className="font-semibold text-emerald-900 mb-1">Your feedback is anonymous</h3>
-              <p className="text-sm text-emerald-800">
-                Google sign-in confirms you are an active Clutch employee and helps us make sure each person responds once.
-                Your answers are stored separately from your login and are never shown with your name, email, Google ID, or employee ID.
-                Results are reported only when at least 3 people have responded, so managers and admins see trends, percentages, charts, and anonymous comments without identifying individual employees.
-              </p>
+              <ul className="list-disc space-y-1 pl-5 text-sm text-emerald-800">
+                <li>Google sign-in confirms you are an active Clutch employee.</li>
+                <li>Each employee can submit only one response.</li>
+                <li>Your answers are stored separately from your sign-in details.</li>
+                <li>Your name, email, Google ID, and employee ID are never shown with your answers.</li>
+                <li>Results are reported only after at least 3 people respond.</li>
+                <li>Managers and admins see only trends, percentages, charts, and anonymous comments.</li>
+              </ul>
             </div>
           </div>
         </div>
