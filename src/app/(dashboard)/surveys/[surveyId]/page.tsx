@@ -12,6 +12,15 @@ interface Question {
   options: string | null;
 }
 
+interface TeamOption {
+  id: string;
+  name: string;
+  departmentId: string;
+  departmentName: string;
+  employeeCount: number;
+  shiftLabel: string;
+}
+
 interface Survey {
   id: string;
   title: string;
@@ -24,14 +33,7 @@ interface Survey {
   demographicOptions?: {
     departments: { id: string; name: string; employeeCount: number }[];
     divisions: { name: string; employeeCount: number }[];
-    teams: {
-      id: string;
-      name: string;
-      departmentId: string;
-      departmentName: string;
-      employeeCount: number;
-      shiftLabel: string;
-    }[];
+    teams: TeamOption[];
     locations: { name: string; employeeCount: number }[];
     currentDepartmentId: string | null;
     currentDivision: string | null;
@@ -53,7 +55,7 @@ export default function TakeSurveyPage({ params }: { params: Promise<{ surveyId:
   const [loading, setLoading] = useState(true);
   const [departmentId, setDepartmentId] = useState("");
   const [division, setDivision] = useState("");
-  const [teamId, setTeamId] = useState("");
+  const [shiftLabel, setShiftLabel] = useState("");
   const [location, setLocation] = useState("");
 
   useEffect(() => {
@@ -63,10 +65,14 @@ export default function TakeSurveyPage({ params }: { params: Promise<{ surveyId:
         setSurvey(d.data);
         if (d.data?.completed) setSubmitted(true);
         if (d.data?.demographicOptions) {
-          setDepartmentId(d.data.demographicOptions.currentDepartmentId || "");
-          setDivision(d.data.demographicOptions.currentDivision || "");
-          setTeamId(d.data.demographicOptions.currentTeamId || "");
-          setLocation(d.data.demographicOptions.currentLocation || "");
+          const demographicOptions = d.data.demographicOptions;
+          const currentTeam = demographicOptions.teams.find(
+            (team: TeamOption) => team.id === demographicOptions.currentTeamId
+          );
+          setDepartmentId(demographicOptions.currentDepartmentId || "");
+          setDivision(demographicOptions.currentDivision || "");
+          setShiftLabel(currentTeam?.shiftLabel || "");
+          setLocation(demographicOptions.currentLocation || "");
         }
       })
       .finally(() => setLoading(false));
@@ -91,11 +97,21 @@ export default function TakeSurveyPage({ params }: { params: Promise<{ surveyId:
         textValue: q.type === "free_text" ? val || null : null,
       };
     });
+    const selectedTeamId =
+      survey.demographicOptions?.teams.find(
+        (team) => team.departmentId === departmentId && team.shiftLabel === shiftLabel
+      )?.id || "";
 
     const res = await fetch(`/api/surveys/${surveyId}/responses`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ answers: answerData, departmentId, division, teamId, location }),
+      body: JSON.stringify({
+        answers: answerData,
+        departmentId,
+        division,
+        teamId: selectedTeamId,
+        location,
+      }),
     });
 
     if (res.ok) {
@@ -209,13 +225,12 @@ export default function TakeSurveyPage({ params }: { params: Promise<{ surveyId:
     );
   }
 
-  const availableTeams = (survey.demographicOptions?.teams || [])
-    .filter((team) => team.departmentId === departmentId)
-    .sort((a, b) => Number(b.id === teamId) - Number(a.id === teamId))
-    .filter(
-      (team, index, teams) =>
-        teams.findIndex((candidate) => candidate.shiftLabel === team.shiftLabel) === index
-    );
+  const teamsForShiftMenu = (survey.demographicOptions?.teams || []).filter(
+    (team) => !departmentId || team.departmentId === departmentId
+  );
+  const shiftOptions = teamsForShiftMenu
+    .map((team) => team.shiftLabel)
+    .filter((label, index, labels) => labels.indexOf(label) === index);
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -274,8 +289,16 @@ export default function TakeSurveyPage({ params }: { params: Promise<{ surveyId:
                 <select
                   value={departmentId}
                   onChange={(e) => {
-                    setDepartmentId(e.target.value);
-                    setTeamId("");
+                    const nextDepartmentId = e.target.value;
+                    const shiftAvailable = (survey.demographicOptions?.teams || []).some(
+                      (team) =>
+                        team.departmentId === nextDepartmentId &&
+                        team.shiftLabel === shiftLabel
+                    );
+                    setDepartmentId(nextDepartmentId);
+                    if (nextDepartmentId && shiftLabel && !shiftAvailable) {
+                      setShiftLabel("");
+                    }
                   }}
                   className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary"
                 >
@@ -309,17 +332,14 @@ export default function TakeSurveyPage({ params }: { params: Promise<{ surveyId:
                   Shift / Line
                 </label>
                 <select
-                  value={teamId}
-                  onChange={(e) => setTeamId(e.target.value)}
-                  disabled={!departmentId}
+                  value={shiftLabel}
+                  onChange={(e) => setShiftLabel(e.target.value)}
                   className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary"
                 >
-                  <option value="">
-                    {departmentId ? "My shift / line is not listed" : "Select a department first"}
-                  </option>
-                  {availableTeams.map((team) => (
-                    <option key={team.id} value={team.id}>
-                      {team.shiftLabel}
+                  <option value="">My shift / line is not listed</option>
+                  {shiftOptions.map((label) => (
+                    <option key={label} value={label}>
+                      {label}
                     </option>
                   ))}
                 </select>

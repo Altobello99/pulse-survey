@@ -134,6 +134,19 @@ export async function POST(
     );
   }
 
+  const requestedTeam = requestedTeamId
+    ? demographicOptions.teams.find((team) => team.id === requestedTeamId)
+    : null;
+  if (
+    requestedTeamId &&
+    (!requestedDepartmentId || requestedTeam?.departmentId !== requestedDepartmentId)
+  ) {
+    return Response.json(
+      { error: "Choose a shift/line that belongs to the selected department." },
+      { status: 400 }
+    );
+  }
+
   if (requestedLocation && !eligibleLocations.has(requestedLocation)) {
     return Response.json(
       { error: "That location is not available for this survey." },
