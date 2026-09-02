@@ -4,8 +4,13 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { departmentedBambooEmployeeWhere } from "@/lib/access";
 import { ANONYMITY_THRESHOLD } from "@/lib/constants";
+import {
+  DEPARTMENT_GROUPS,
+  departmentBelongsToGroup,
+  findDepartmentGroup,
+} from "@/lib/department-groups";
 
-const BREAKDOWNS = ["department", "location", "department_location"] as const;
+const BREAKDOWNS = ["overall", "department", "location", "department_location"] as const;
 type Breakdown = (typeof BREAKDOWNS)[number];
 
 type GroupDefinition = {
@@ -34,7 +39,20 @@ export async function GET(request: NextRequest) {
 
   const breakdown = requestedBreakdown as Breakdown;
   const departmentIdFilter = request.nextUrl.searchParams.get("departmentId")?.trim() || null;
+  const departmentGroupIdFilter = request.nextUrl.searchParams.get("departmentGroup")?.trim() || null;
   const locationFilter = request.nextUrl.searchParams.get("location")?.trim() || null;
+  const departmentGroupFilter = findDepartmentGroup(departmentGroupIdFilter);
+
+  if (departmentGroupIdFilter && !departmentGroupFilter) {
+    return Response.json({ error: "Invalid department group" }, { status: 400 });
+  }
+
+  if (departmentIdFilter && departmentGroupFilter) {
+    return Response.json(
+      { error: "Choose either a department or a department group" },
+      { status: 400 }
+    );
+  }
 
   const [survey, activeEmployees] = await Promise.all([
     prisma.survey.findUnique({
@@ -92,8 +110,18 @@ export async function GET(request: NextRequest) {
 
   const filteredEmployees = activeEmployees.filter((employee) => {
     if (departmentIdFilter && employee.departmentId !== departmentIdFilter) return false;
+    if (
+      departmentGroupFilter &&
+      !departmentBelongsToGroup(employee.department.name, departmentGroupFilter)
+    ) return false;
     if (locationFilter && employee.location !== locationFilter) return false;
     return true;
+  });
+
+  const overallLabel = buildOverallLabel({
+    departmentName: departmentIdFilter ? departmentOptions.get(departmentIdFilter) || null : null,
+    departmentGroupName: departmentGroupFilter?.name || null,
+    location: locationFilter,
   });
 
   const groupDefinitions = new Map<string, GroupDefinition>();
@@ -102,7 +130,8 @@ export async function GET(request: NextRequest) {
       breakdown,
       employee.departmentId,
       employee.department.name,
-      employee.location
+      employee.location,
+      overallLabel
     );
     groupDefinitions.set(definition.id, definition);
   }
@@ -111,9 +140,7 @@ export async function GET(request: NextRequest) {
   const responses = await prisma.surveyResponse.findMany({
     where: {
       surveyId,
-      departmentId: departmentIdFilter
-        ? departmentIdFilter
-        : { in: filteredDepartmentIds },
+      departmentId: { in: filteredDepartmentIds },
       ...(locationFilter ? { location: locationFilter } : {}),
     },
     select: {
@@ -139,7 +166,8 @@ export async function GET(request: NextRequest) {
       breakdown,
       response.departmentId,
       response.department.name,
-      response.location
+      response.location,
+      overallLabel
     );
     if (!groupDefinitions.has(group.id)) continue;
 
@@ -205,6 +233,9 @@ export async function GET(request: NextRequest) {
   const promoters = enpsValues.filter((value) => value >= 9).length;
   const passives = enpsValues.filter((value) => value >= 7 && value <= 8).length;
   const detractors = enpsValues.filter((value) => value <= 6).length;
+  const enpsScore = enpsValues.length
+    ? Math.round(((promoters - detractors) / enpsValues.length) * 100)
+    : null;
 
   const bestFriendChoices = bestFriendQuestion
     ? responses.flatMap((response) =>
@@ -232,9 +263,10 @@ export async function GET(request: NextRequest) {
           questionText: enpsQuestion?.text || null,
           status: enpsStatus,
           totalResponses: enpsStatus === "available" ? enpsValues.length : null,
-          score: enpsStatus === "available"
-            ? Math.round(((promoters - detractors) / enpsValues.length) * 100)
-            : null,
+          score: enpsStatus === "available" ? enpsScore : null,
+          promotersCount: enpsStatus === "available" ? promoters : null,
+          passivesCount: enpsStatus === "available" ? passives : null,
+          detractorsCount: enpsStatus === "available" ? detractors : null,
           promotersPercent: enpsStatus === "available"
             ? percentage(promoters, enpsValues.length)
             : null,
@@ -264,6 +296,19 @@ export async function GET(request: NextRequest) {
         departments: [...departmentOptions.entries()]
           .map(([id, name]) => ({ id, name }))
           .sort((a, b) => a.name.localeCompare(b.name)),
+        departmentGroups: DEPARTMENT_GROUPS.map((group) => {
+          const groupedDepartments = [...departmentOptions.entries()]
+            .filter(([, name]) => departmentBelongsToGroup(name, group))
+            .map(([id, name]) => ({ id, name }))
+            .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+
+          return {
+            id: group.id,
+            name: group.name,
+            departmentCodes: [...group.departmentCodes],
+            departmentIds: groupedDepartments.map((department) => department.id),
+          };
+        }).filter((group) => group.departmentIds.length > 0),
         locations: [...locationOptions].sort((a, b) => a.localeCompare(b)),
       },
       threshold: ANONYMITY_THRESHOLD,
@@ -286,9 +331,20 @@ function makeGroupDefinition(
   breakdown: Breakdown,
   departmentId: string,
   departmentName: string,
-  location: string | null
+  location: string | null,
+  overallLabel: string
 ): GroupDefinition {
   const locationLabel = location || "Location not recorded";
+
+  if (breakdown === "overall") {
+    return {
+      id: "overall",
+      label: overallLabel,
+      departmentId: null,
+      departmentName: null,
+      location: null,
+    };
+  }
 
   if (breakdown === "department") {
     return {
@@ -317,6 +373,21 @@ function makeGroupDefinition(
     departmentName,
     location,
   };
+}
+
+function buildOverallLabel({
+  departmentName,
+  departmentGroupName,
+  location,
+}: {
+  departmentName: string | null;
+  departmentGroupName: string | null;
+  location: string | null;
+}) {
+  const scope = departmentGroupName
+    ? `${departmentGroupName} combined`
+    : departmentName || "All departments";
+  return location ? `${scope} - ${location}` : scope;
 }
 
 function ratingOptions(options: string | null) {

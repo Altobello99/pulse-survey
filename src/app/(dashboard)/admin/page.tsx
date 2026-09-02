@@ -52,8 +52,6 @@ type DashboardStats = {
   totalEmployees: number;
   activeSurveys: number;
   avgParticipation: number;
-  sentimentScore: number | null;
-  sentimentLabel: string;
 };
 
 type ApiResponse<T> = {
@@ -61,7 +59,7 @@ type ApiResponse<T> = {
   error?: string;
 };
 
-type RatingsBreakdown = "department" | "location" | "department_location";
+type RatingsBreakdown = "overall" | "department" | "location" | "department_location";
 type RatingsSort =
   | "alphabetical_asc"
   | "alphabetical_desc"
@@ -99,6 +97,9 @@ type QuestionRatingsData = {
       status: MetricStatus;
       totalResponses: number | null;
       score: number | null;
+      promotersCount: number | null;
+      passivesCount: number | null;
+      detractorsCount: number | null;
       promotersPercent: number | null;
       passivesPercent: number | null;
       detractorsPercent: number | null;
@@ -114,6 +115,12 @@ type QuestionRatingsData = {
   };
   filterOptions: {
     departments: Array<{ id: string; name: string }>;
+    departmentGroups: Array<{
+      id: string;
+      name: string;
+      departmentCodes: string[];
+      departmentIds: string[];
+    }>;
     locations: string[];
   };
   threshold: number;
@@ -203,16 +210,10 @@ export default function AdminDashboard() {
                 participationData.length
             )
           : 0;
-      const latestSentiment = trendData.length > 0
-        ? trendData[trendData.length - 1]
-        : null;
-
       setStats({
         totalEmployees,
         activeSurveys,
         avgParticipation,
-        sentimentScore: latestSentiment?.score ?? null,
-        sentimentLabel: latestSentiment?.sentiment ?? "N/A",
       });
 
       setLoading(false);
@@ -227,7 +228,11 @@ export default function AdminDashboard() {
       surveyId: selectedSurveyId,
       breakdown: ratingsBreakdown,
     });
-    if (departmentFilter) params.set("departmentId", departmentFilter);
+    if (departmentFilter.startsWith("group:")) {
+      params.set("departmentGroup", departmentFilter.slice("group:".length));
+    } else if (departmentFilter) {
+      params.set("departmentId", departmentFilter);
+    }
     if (locationFilter) params.set("location", locationFilter);
 
     fetch(`/api/analytics/question-ratings?${params.toString()}`)
@@ -318,6 +323,32 @@ export default function AdminDashboard() {
 
     return groups;
   }, [questionRatings, ratingsSort, visibleQuestions]);
+  const groupedDepartmentIds = useMemo(
+    () => new Set(
+      (questionRatings?.filterOptions.departmentGroups || [])
+        .flatMap((group) => group.departmentIds)
+    ),
+    [questionRatings]
+  );
+  const ungroupedDepartments = useMemo(
+    () => (questionRatings?.filterOptions.departments || []).filter(
+      (department) => !groupedDepartmentIds.has(department.id)
+    ),
+    [groupedDepartmentIds, questionRatings]
+  );
+  const enpsMetric = questionRatings?.metrics.enps;
+  const enpsCardValue = questionRatingsLoading
+    ? "..."
+    : enpsMetric?.status === "available" && enpsMetric.score !== null
+      ? `${enpsMetric.score > 0 ? "+" : ""}${enpsMetric.score}`
+      : "N/A";
+  const enpsCardColor = enpsMetric?.status === "available" && enpsMetric.score !== null
+    ? enpsMetric.score > 0
+      ? "text-emerald-600"
+      : enpsMetric.score < 0
+        ? "text-red-600"
+        : "text-slate-900"
+    : "text-slate-500";
 
   if (loading) {
     return (
@@ -363,15 +394,7 @@ export default function AdminDashboard() {
           { label: "Eligible Employees", value: stats?.totalEmployees ?? 0, color: "text-slate-900" },
           { label: "Active Surveys", value: stats?.activeSurveys ?? 0, color: "text-primary" },
           { label: "Avg Participation", value: `${stats?.avgParticipation ?? 0}%`, color: "text-secondary" },
-          {
-            label: "Latest Sentiment",
-            value: stats?.sentimentLabel ?? "N/A",
-            color: stats?.sentimentLabel === "positive"
-              ? "text-emerald-600"
-              : stats?.sentimentLabel === "negative"
-              ? "text-red-600"
-              : "text-amber-600",
-          },
+          { label: "eNPS (Selected View)", value: enpsCardValue, color: enpsCardColor },
         ].map((s) => (
           <div key={s.label} className="bg-white rounded-xl border border-slate-200 p-6">
             <p className="text-sm text-slate-500 mb-1">{s.label}</p>
@@ -421,20 +444,41 @@ export default function AdminDashboard() {
               <option value="department_location">Department + location</option>
               <option value="department">Department</option>
               <option value="location">Location</option>
+              <option value="overall">Selected results combined</option>
             </select>
           </label>
 
           <label className="block min-w-0">
-            <span className="mb-1 block text-xs font-medium text-slate-600">Department</span>
+            <span className="mb-1 block text-xs font-medium text-slate-600">Department or group</span>
             <select
               value={departmentFilter}
-              onChange={(event) => setDepartmentFilter(event.target.value)}
+              onChange={(event) => {
+                const value = event.target.value;
+                setDepartmentFilter(value);
+                if (value.startsWith("group:")) setRatingsBreakdown("overall");
+              }}
               className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
             >
               <option value="">All departments</option>
-              {(questionRatings?.filterOptions.departments || []).map((department) => (
-                <option key={department.id} value={department.id}>{department.name}</option>
+              {(questionRatings?.filterOptions.departmentGroups || []).map((group) => (
+                <optgroup key={group.id} label={group.name}>
+                  <option value={`group:${group.id}`}>
+                    {group.name} - combined ({group.departmentCodes.join(", ")})
+                  </option>
+                  {(questionRatings?.filterOptions.departments || [])
+                    .filter((department) => group.departmentIds.includes(department.id))
+                    .map((department) => (
+                      <option key={department.id} value={department.id}>{department.name}</option>
+                    ))}
+                </optgroup>
               ))}
+              {ungroupedDepartments.length > 0 && (
+                <optgroup label="Other departments">
+                  {ungroupedDepartments.map((department) => (
+                    <option key={department.id} value={department.id}>{department.name}</option>
+                  ))}
+                </optgroup>
+              )}
             </select>
           </label>
 
@@ -519,7 +563,7 @@ export default function AdminDashboard() {
                       <p className={`text-4xl font-bold ${questionRatings.metrics.enps.score >= 0 ? "text-primary" : "text-red-600"}`}>
                         {questionRatings.metrics.enps.score > 0 ? "+" : ""}{questionRatings.metrics.enps.score}
                       </p>
-                      <p className="text-xs font-medium uppercase text-slate-500">eNPS</p>
+                      <p className="text-xs font-medium uppercase text-slate-500">Calculated eNPS</p>
                     </div>
                   ) : null}
                 </div>
@@ -542,6 +586,12 @@ export default function AdminDashboard() {
                     </div>
                     <p className="mt-3 text-xs text-slate-500">
                       Based on {questionRatings.metrics.enps.totalResponses} filtered responses.
+                    </p>
+                    <p className="mt-1 text-xs font-medium text-slate-600">
+                      ({questionRatings.metrics.enps.promotersCount} promoters - {questionRatings.metrics.enps.detractorsCount} detractors) / {questionRatings.metrics.enps.totalResponses} responses x 100 = {questionRatings.metrics.enps.score! > 0 ? "+" : ""}{questionRatings.metrics.enps.score} eNPS.
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      The score uses exact response counts; category percentages are rounded for display.
                     </p>
                   </>
                 ) : (
