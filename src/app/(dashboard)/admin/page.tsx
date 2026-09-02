@@ -141,6 +141,40 @@ function ratingTone(average: number, minimum: number, maximum: number) {
   return "border-rose-200 bg-rose-50 text-rose-800";
 }
 
+const ENPS_RANGES = [
+  {
+    range: "-100 to -1",
+    label: "Significant concern",
+    description: "There are more detractors than promoters. Prioritize listening and focused action.",
+    color: "border-rose-500",
+  },
+  {
+    range: "0 to 29",
+    label: "Room for improvement",
+    description: "Advocacy is positive, with meaningful opportunities to improve the employee experience.",
+    color: "border-amber-400",
+  },
+  {
+    range: "30 to 69",
+    label: "Healthy advocacy",
+    description: "Employees show strong advocacy and are generally willing to recommend the company.",
+    color: "border-sky-500",
+  },
+  {
+    range: "70 to 100",
+    label: "Exceptional advocacy",
+    description: "Employee advocacy is exceptionally strong, with relatively few detractors.",
+    color: "border-emerald-500",
+  },
+] as const;
+
+function enpsRangeLabel(score: number) {
+  if (score < 0) return ENPS_RANGES[0].label;
+  if (score < 30) return ENPS_RANGES[1].label;
+  if (score < 70) return ENPS_RANGES[2].label;
+  return ENPS_RANGES[3].label;
+}
+
 async function fetchData<T>(url: string): Promise<ApiResponse<T>> {
   const response = await fetch(url);
   const payload = await response.json() as ApiResponse<T>;
@@ -347,6 +381,12 @@ export default function AdminDashboard() {
         ? "text-red-600"
         : "text-slate-900"
     : "text-slate-500";
+  const currentEnpsScore = enpsMetric?.status === "available" && enpsMetric.score !== null
+    ? enpsMetric.score
+    : null;
+  const enpsMarkerPosition = currentEnpsScore === null
+    ? null
+    : Math.min(97, Math.max(3, (currentEnpsScore + 100) / 2));
   const selectedParticipation = participation.find(
     (point) => point.id === selectedSurveyId
   ) || participation[participation.length - 1] || null;
@@ -679,6 +719,71 @@ export default function AdminDashboard() {
                   </p>
                 )}
               </div>
+            </div>
+
+            <div className="border-t border-slate-200 px-6 py-6">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h3 className="font-semibold text-slate-900">What is a good eNPS?</h3>
+                  <p className="mt-1 text-sm text-slate-500">
+                    Use these ranges to interpret the calculated score from -100 to +100.
+                  </p>
+                </div>
+                {currentEnpsScore !== null && (
+                  <div className="text-right">
+                    <p className="text-sm font-semibold text-slate-900">
+                      Current range: {enpsRangeLabel(currentEnpsScore)}
+                    </p>
+                    <p className="text-xs text-slate-500">For the filters selected above</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-9">
+                <div className="relative">
+                  {currentEnpsScore !== null && enpsMarkerPosition !== null && (
+                    <div
+                      className="absolute -top-7 z-10 -translate-x-1/2 whitespace-nowrap text-xs font-bold text-slate-900"
+                      style={{ left: `${enpsMarkerPosition}%` }}
+                    >
+                      Current {currentEnpsScore > 0 ? "+" : ""}{currentEnpsScore}
+                    </div>
+                  )}
+                  <div className="flex h-5 overflow-hidden rounded-sm" aria-label="eNPS interpretation scale">
+                    <div className="w-1/2 bg-rose-500" title="Significant concern" />
+                    <div className="w-[15%] bg-amber-400" title="Room for improvement" />
+                    <div className="w-1/5 bg-sky-500" title="Healthy advocacy" />
+                    <div className="w-[15%] bg-emerald-500" title="Exceptional advocacy" />
+                  </div>
+                  {enpsMarkerPosition !== null && (
+                    <div
+                      className="absolute -top-1 h-7 w-0.5 -translate-x-1/2 bg-slate-950"
+                      style={{ left: `${enpsMarkerPosition}%` }}
+                    />
+                  )}
+                  <div className="relative mt-1 h-5 text-xs font-medium text-slate-500" aria-hidden="true">
+                    <span className="absolute left-0">-100</span>
+                    <span className="absolute left-1/2 -translate-x-1/2">0</span>
+                    <span className="absolute left-[65%] -translate-x-1/2">30</span>
+                    <span className="absolute left-[85%] -translate-x-1/2">70</span>
+                    <span className="absolute right-0">100</span>
+                  </div>
+                </div>
+
+                <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                  {ENPS_RANGES.map((range) => (
+                    <div key={range.range} className={`border-t-4 pt-3 ${range.color}`}>
+                      <p className="text-xs font-semibold text-slate-500">{range.range}</p>
+                      <p className="mt-1 font-semibold text-slate-900">{range.label}</p>
+                      <p className="mt-1 text-sm leading-5 text-slate-600">{range.description}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <p className="mt-5 text-xs text-slate-500">
+                These ranges are an interpretation guide, not a universal benchmark. Read eNPS alongside participation, comments, and changes over time.
+              </p>
             </div>
 
             <div className="border-t border-blue-200 bg-blue-50 px-6 py-5">
