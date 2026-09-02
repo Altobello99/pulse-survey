@@ -277,8 +277,8 @@ export default function TakeSurveyPage({ params }: { params: Promise<{ surveyId:
                 Department, Division, Shift and Location
               </h2>
               <p className="mt-1 text-sm text-slate-500">
-                Options come from BambooHR and only groups with 10 or more active employees are listed.
-                Manager reporting is pulled from BambooHR automatically.
+                Departments, divisions, and locations with 10 or more active employees are listed.
+                Shift / line options and manager reporting come directly from BambooHR.
               </p>
             </div>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

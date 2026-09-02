@@ -53,17 +53,17 @@ export async function getEligibleSurveyDemographics() {
     },
     orderBy: { name: "asc" },
   });
-  const eligibleTeamCounts = new Map(
+  const activeTeamCounts = new Map(
     teamCounts
       .filter(
         (row): row is typeof row & { teamId: string } =>
-          Boolean(row.teamId) && row._count._all >= DEMOGRAPHIC_OPTION_EMPLOYEE_THRESHOLD
+          Boolean(row.teamId) && row._count._all > 0
       )
       .map((row) => [row.teamId, row._count._all])
   );
   const teams = await prisma.team.findMany({
     where: {
-      id: { in: [...eligibleTeamCounts.keys()] },
+      id: { in: [...activeTeamCounts.keys()] },
       name: { not: "Unassigned" },
     },
     include: { department: { select: { id: true, name: true } } },
@@ -90,7 +90,7 @@ export async function getEligibleSurveyDemographics() {
       name: team.name,
       departmentId: team.departmentId,
       departmentName: team.department.name,
-      employeeCount: eligibleTeamCounts.get(team.id) || 0,
+      employeeCount: activeTeamCounts.get(team.id) || 0,
       shiftLabel: formatShiftLine(team.name),
     })),
     locations: locationCounts
