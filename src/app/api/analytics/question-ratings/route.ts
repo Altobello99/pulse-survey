@@ -5,6 +5,17 @@ import { prisma } from "@/lib/prisma";
 import { departmentedBambooEmployeeWhere } from "@/lib/access";
 import { ANONYMITY_THRESHOLD } from "@/lib/constants";
 
+const BREAKDOWNS = ["department", "location", "department_location"] as const;
+type Breakdown = (typeof BREAKDOWNS)[number];
+
+type GroupDefinition = {
+  id: string;
+  label: string;
+  departmentId: string | null;
+  departmentName: string | null;
+  location: string | null;
+};
+
 export async function GET(request: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session || session.user.role !== "admin") {
@@ -16,64 +27,108 @@ export async function GET(request: NextRequest) {
     return Response.json({ error: "Missing surveyId" }, { status: 400 });
   }
 
-  const survey = await prisma.survey.findUnique({
-    where: { id: surveyId },
-    select: {
-      id: true,
-      title: true,
-      questions: {
-        where: { type: "rating" },
-        orderBy: { order: "asc" },
-        select: {
-          id: true,
-          text: true,
-          order: true,
-          options: true,
+  const requestedBreakdown = request.nextUrl.searchParams.get("breakdown") || "department_location";
+  if (!BREAKDOWNS.includes(requestedBreakdown as Breakdown)) {
+    return Response.json({ error: "Invalid breakdown" }, { status: 400 });
+  }
+
+  const breakdown = requestedBreakdown as Breakdown;
+  const departmentIdFilter = request.nextUrl.searchParams.get("departmentId")?.trim() || null;
+  const locationFilter = request.nextUrl.searchParams.get("location")?.trim() || null;
+
+  const [survey, activeEmployees] = await Promise.all([
+    prisma.survey.findUnique({
+      where: { id: surveyId },
+      select: {
+        id: true,
+        title: true,
+        questions: {
+          where: { type: "rating" },
+          orderBy: { order: "asc" },
+          select: {
+            id: true,
+            text: true,
+            section: true,
+            order: true,
+            options: true,
+          },
         },
       },
-    },
-  });
+    }),
+    prisma.user.findMany({
+      where: departmentedBambooEmployeeWhere,
+      select: {
+        departmentId: true,
+        location: true,
+        department: { select: { name: true } },
+      },
+    }),
+  ]);
 
   if (!survey) {
     return Response.json({ error: "Survey not found" }, { status: 404 });
   }
 
-  const departmentCounts = await prisma.user.groupBy({
-    by: ["departmentId"],
-    where: departmentedBambooEmployeeWhere,
-    _count: { _all: true },
+  const departmentOptions = new Map<string, string>();
+  const locationOptions = new Set<string>();
+  for (const employee of activeEmployees) {
+    departmentOptions.set(employee.departmentId, employee.department.name);
+    if (employee.location) locationOptions.add(employee.location);
+  }
+
+  const filteredEmployees = activeEmployees.filter((employee) => {
+    if (departmentIdFilter && employee.departmentId !== departmentIdFilter) return false;
+    if (locationFilter && employee.location !== locationFilter) return false;
+    return true;
   });
-  const departmentIds = departmentCounts.map((department) => department.departmentId);
 
-  const [departments, responses] = await Promise.all([
-    prisma.department.findMany({
-      where: { id: { in: departmentIds } },
-      select: { id: true, name: true },
-      orderBy: { name: "asc" },
-    }),
-    prisma.surveyResponse.findMany({
-      where: {
-        surveyId,
-        departmentId: { in: departmentIds },
-      },
-      select: {
-        departmentId: true,
-        answers: {
-          where: {
-            questionId: { in: survey.questions.map((question) => question.id) },
-            ratingValue: { not: null },
-          },
-          select: { questionId: true, ratingValue: true },
+  const groupDefinitions = new Map<string, GroupDefinition>();
+  for (const employee of filteredEmployees) {
+    const definition = makeGroupDefinition(
+      breakdown,
+      employee.departmentId,
+      employee.department.name,
+      employee.location
+    );
+    groupDefinitions.set(definition.id, definition);
+  }
+
+  const filteredDepartmentIds = [...new Set(filteredEmployees.map((employee) => employee.departmentId))];
+  const responses = await prisma.surveyResponse.findMany({
+    where: {
+      surveyId,
+      departmentId: departmentIdFilter
+        ? departmentIdFilter
+        : { in: filteredDepartmentIds },
+      ...(locationFilter ? { location: locationFilter } : {}),
+    },
+    select: {
+      departmentId: true,
+      location: true,
+      department: { select: { name: true } },
+      answers: {
+        where: {
+          questionId: { in: survey.questions.map((question) => question.id) },
+          ratingValue: { not: null },
         },
+        select: { questionId: true, ratingValue: true },
       },
-    }),
-  ]);
+    },
+  });
 
-  const responsesByDepartment = new Map<string, typeof responses>();
+  const responsesByGroup = new Map<string, typeof responses>();
   for (const response of responses) {
-    const existing = responsesByDepartment.get(response.departmentId) || [];
+    const group = makeGroupDefinition(
+      breakdown,
+      response.departmentId,
+      response.department.name,
+      response.location
+    );
+    if (!groupDefinitions.has(group.id)) continue;
+
+    const existing = responsesByGroup.get(group.id) || [];
     existing.push(response);
-    responsesByDepartment.set(response.departmentId, existing);
+    responsesByGroup.set(group.id, existing);
   }
 
   const questions = survey.questions.map((question) => {
@@ -81,52 +136,98 @@ export async function GET(request: NextRequest) {
     return {
       id: question.id,
       text: question.text,
+      section: question.section || "Other",
       order: question.order,
       scaleMin: Math.min(...scale),
       scaleMax: Math.max(...scale),
     };
   });
 
-  const departmentData = departments.map((department) => {
-    const departmentResponses = responsesByDepartment.get(department.id) || [];
-    const responseCount = departmentResponses.length;
-    const status = responseCount === 0
-      ? "no_responses"
-      : responseCount < ANONYMITY_THRESHOLD
-        ? "suppressed"
-        : "available";
+  const groups = [...groupDefinitions.values()]
+    .sort((a, b) => a.label.localeCompare(b.label))
+    .map((group) => {
+      const groupResponses = responsesByGroup.get(group.id) || [];
+      const responseCount = groupResponses.length;
+      const status = responseCount === 0
+        ? "no_responses"
+        : responseCount < ANONYMITY_THRESHOLD
+          ? "suppressed"
+          : "available";
 
-    return {
-      id: department.id,
-      name: department.name,
-      responseCount: status === "available" ? responseCount : null,
-      status,
-      ratings: questions.map((question) => {
-        const values = departmentResponses.flatMap((response) =>
-          response.answers
-            .filter((answer) => answer.questionId === question.id)
-            .map((answer) => answer.ratingValue)
-            .filter((value): value is number => value !== null)
-        );
+      return {
+        ...group,
+        responseCount: status === "available" ? responseCount : null,
+        status,
+        ratings: questions.map((question) => {
+          const values = groupResponses.flatMap((response) =>
+            response.answers
+              .filter((answer) => answer.questionId === question.id)
+              .map((answer) => answer.ratingValue)
+              .filter((value): value is number => value !== null)
+          );
 
-        return {
-          questionId: question.id,
-          average: status === "available" && values.length >= ANONYMITY_THRESHOLD
-            ? Math.round((values.reduce((sum, value) => sum + value, 0) / values.length) * 10) / 10
-            : null,
-        };
-      }),
-    };
-  });
+          return {
+            questionId: question.id,
+            average: status === "available" && values.length >= ANONYMITY_THRESHOLD
+              ? Math.round((values.reduce((sum, value) => sum + value, 0) / values.length) * 10) / 10
+              : null,
+          };
+        }),
+      };
+    });
 
   return Response.json({
     data: {
       survey: { id: survey.id, title: survey.title },
+      breakdown,
       questions,
-      departments: departmentData,
+      groups,
+      filterOptions: {
+        departments: [...departmentOptions.entries()]
+          .map(([id, name]) => ({ id, name }))
+          .sort((a, b) => a.name.localeCompare(b.name)),
+        locations: [...locationOptions].sort((a, b) => a.localeCompare(b)),
+      },
       threshold: ANONYMITY_THRESHOLD,
     },
   });
+}
+
+function makeGroupDefinition(
+  breakdown: Breakdown,
+  departmentId: string,
+  departmentName: string,
+  location: string | null
+): GroupDefinition {
+  const locationLabel = location || "Location not recorded";
+
+  if (breakdown === "department") {
+    return {
+      id: `department:${departmentId}`,
+      label: departmentName,
+      departmentId,
+      departmentName,
+      location: null,
+    };
+  }
+
+  if (breakdown === "location") {
+    return {
+      id: `location:${locationLabel}`,
+      label: locationLabel,
+      departmentId: null,
+      departmentName: null,
+      location,
+    };
+  }
+
+  return {
+    id: `department-location:${departmentId}:${locationLabel}`,
+    label: `${departmentName} - ${locationLabel}`,
+    departmentId,
+    departmentName,
+    location,
+  };
 }
 
 function ratingOptions(options: string | null) {
