@@ -43,12 +43,12 @@ export async function GET(request: NextRequest) {
         id: true,
         title: true,
         questions: {
-          where: { type: "rating" },
           orderBy: { order: "asc" },
           select: {
             id: true,
             text: true,
             section: true,
+            type: true,
             order: true,
             options: true,
           },
@@ -68,6 +68,20 @@ export async function GET(request: NextRequest) {
   if (!survey) {
     return Response.json({ error: "Survey not found" }, { status: 404 });
   }
+
+  const ratingQuestions = survey.questions.filter((question) => question.type === "rating");
+  const enpsQuestion = ratingQuestions.find((question) => {
+    const scale = ratingOptions(question.options);
+    return Math.min(...scale) === 0 && Math.max(...scale) === 10 &&
+      /recommend.+place to work/i.test(question.text);
+  }) || null;
+  const bestFriendQuestion = survey.questions.find(
+    (question) => question.type === "multiple_choice" && /best friend at work/i.test(question.text)
+  ) || null;
+  const analyticsQuestionIds = [
+    ...ratingQuestions.map((question) => question.id),
+    ...(bestFriendQuestion ? [bestFriendQuestion.id] : []),
+  ];
 
   const departmentOptions = new Map<string, string>();
   const locationOptions = new Set<string>();
@@ -108,10 +122,13 @@ export async function GET(request: NextRequest) {
       department: { select: { name: true } },
       answers: {
         where: {
-          questionId: { in: survey.questions.map((question) => question.id) },
-          ratingValue: { not: null },
+          questionId: { in: analyticsQuestionIds },
+          OR: [
+            { ratingValue: { not: null } },
+            { choiceValue: { not: null } },
+          ],
         },
-        select: { questionId: true, ratingValue: true },
+        select: { questionId: true, ratingValue: true, choiceValue: true },
       },
     },
   });
@@ -131,7 +148,7 @@ export async function GET(request: NextRequest) {
     responsesByGroup.set(group.id, existing);
   }
 
-  const questions = survey.questions.map((question) => {
+  const questions = ratingQuestions.map((question) => {
     const scale = ratingOptions(question.options);
     return {
       id: question.id,
@@ -176,12 +193,73 @@ export async function GET(request: NextRequest) {
       };
     });
 
+  const enpsValues = enpsQuestion
+    ? responses.flatMap((response) =>
+        response.answers
+          .filter((answer) => answer.questionId === enpsQuestion.id)
+          .map((answer) => answer.ratingValue)
+          .filter((value): value is number => value !== null)
+      )
+    : [];
+  const enpsStatus = metricStatus(Boolean(enpsQuestion), enpsValues.length);
+  const promoters = enpsValues.filter((value) => value >= 9).length;
+  const passives = enpsValues.filter((value) => value >= 7 && value <= 8).length;
+  const detractors = enpsValues.filter((value) => value <= 6).length;
+
+  const bestFriendChoices = bestFriendQuestion
+    ? responses.flatMap((response) =>
+        response.answers
+          .filter((answer) => answer.questionId === bestFriendQuestion.id)
+          .map((answer) => answer.choiceValue?.trim().toLowerCase())
+          .filter((value): value is string => Boolean(value))
+      )
+    : [];
+  const bestFriendStatus = metricStatus(Boolean(bestFriendQuestion), bestFriendChoices.length);
+  const friendYes = bestFriendChoices.filter((value) => value === "yes").length;
+  const friendNo = bestFriendChoices.filter((value) => value === "no").length;
+  const friendPreferNotToSay = bestFriendChoices.filter(
+    (value) => value === "prefer not to say"
+  ).length;
+
   return Response.json({
     data: {
       survey: { id: survey.id, title: survey.title },
       breakdown,
       questions,
       groups,
+      metrics: {
+        enps: {
+          questionText: enpsQuestion?.text || null,
+          status: enpsStatus,
+          totalResponses: enpsStatus === "available" ? enpsValues.length : null,
+          score: enpsStatus === "available"
+            ? Math.round(((promoters - detractors) / enpsValues.length) * 100)
+            : null,
+          promotersPercent: enpsStatus === "available"
+            ? percentage(promoters, enpsValues.length)
+            : null,
+          passivesPercent: enpsStatus === "available"
+            ? percentage(passives, enpsValues.length)
+            : null,
+          detractorsPercent: enpsStatus === "available"
+            ? percentage(detractors, enpsValues.length)
+            : null,
+        },
+        bestFriend: {
+          questionText: bestFriendQuestion?.text || null,
+          status: bestFriendStatus,
+          totalResponses: bestFriendStatus === "available" ? bestFriendChoices.length : null,
+          yesPercent: bestFriendStatus === "available"
+            ? percentage(friendYes, bestFriendChoices.length)
+            : null,
+          noPercent: bestFriendStatus === "available"
+            ? percentage(friendNo, bestFriendChoices.length)
+            : null,
+          preferNotToSayPercent: bestFriendStatus === "available"
+            ? percentage(friendPreferNotToSay, bestFriendChoices.length)
+            : null,
+        },
+      },
       filterOptions: {
         departments: [...departmentOptions.entries()]
           .map(([id, name]) => ({ id, name }))
@@ -191,6 +269,17 @@ export async function GET(request: NextRequest) {
       threshold: ANONYMITY_THRESHOLD,
     },
   });
+}
+
+function metricStatus(questionExists: boolean, responseCount: number) {
+  if (!questionExists) return "not_configured" as const;
+  if (responseCount === 0) return "no_responses" as const;
+  if (responseCount < ANONYMITY_THRESHOLD) return "suppressed" as const;
+  return "available" as const;
+}
+
+function percentage(count: number, total: number) {
+  return total ? Math.round((count / total) * 100) : 0;
 }
 
 function makeGroupDefinition(

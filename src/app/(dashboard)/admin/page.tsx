@@ -69,6 +69,7 @@ type RatingsSort =
   | "rating_asc"
   | "responses_desc"
   | "responses_asc";
+type MetricStatus = "available" | "suppressed" | "no_responses" | "not_configured";
 
 type QuestionRatingsData = {
   queryKey: string;
@@ -92,6 +93,25 @@ type QuestionRatingsData = {
     status: "no_responses" | "suppressed" | "available";
     ratings: Array<{ questionId: string; average: number | null }>;
   }>;
+  metrics: {
+    enps: {
+      questionText: string | null;
+      status: MetricStatus;
+      totalResponses: number | null;
+      score: number | null;
+      promotersPercent: number | null;
+      passivesPercent: number | null;
+      detractorsPercent: number | null;
+    };
+    bestFriend: {
+      questionText: string | null;
+      status: MetricStatus;
+      totalResponses: number | null;
+      yesPercent: number | null;
+      noPercent: number | null;
+      preferNotToSayPercent: number | null;
+    };
+  };
   filterOptions: {
     departments: Array<{ id: string; name: string }>;
     locations: string[];
@@ -481,6 +501,123 @@ export default function AdminDashboard() {
             </select>
           </label>
         </div>
+
+        {!questionRatingsLoading && questionRatings && (
+          <>
+            <div className="grid border-t border-slate-200 lg:grid-cols-2">
+              <div className="border-b border-slate-200 p-6 lg:border-b-0 lg:border-r">
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div>
+                    <h3 className="font-semibold text-slate-900">Employee Net Promoter Score (eNPS)</h3>
+                    <p className="mt-1 max-w-xl text-sm text-slate-500">
+                      {questionRatings.metrics.enps.questionText || "No eNPS question is configured for this survey."}
+                    </p>
+                  </div>
+                  {questionRatings.metrics.enps.status === "available" &&
+                  questionRatings.metrics.enps.score !== null ? (
+                    <div className="text-right">
+                      <p className={`text-4xl font-bold ${questionRatings.metrics.enps.score >= 0 ? "text-primary" : "text-red-600"}`}>
+                        {questionRatings.metrics.enps.score > 0 ? "+" : ""}{questionRatings.metrics.enps.score}
+                      </p>
+                      <p className="text-xs font-medium uppercase text-slate-500">eNPS</p>
+                    </div>
+                  ) : null}
+                </div>
+
+                {questionRatings.metrics.enps.status === "available" ? (
+                  <>
+                    <div className="mt-5 grid grid-cols-3 divide-x divide-slate-200 border-y border-slate-200 py-3 text-center">
+                      <div className="px-2">
+                        <p className="text-lg font-semibold text-emerald-700">{questionRatings.metrics.enps.promotersPercent}%</p>
+                        <p className="text-xs text-slate-500">Promoters 9-10</p>
+                      </div>
+                      <div className="px-2">
+                        <p className="text-lg font-semibold text-amber-700">{questionRatings.metrics.enps.passivesPercent}%</p>
+                        <p className="text-xs text-slate-500">Passives 7-8</p>
+                      </div>
+                      <div className="px-2">
+                        <p className="text-lg font-semibold text-rose-700">{questionRatings.metrics.enps.detractorsPercent}%</p>
+                        <p className="text-xs text-slate-500">Detractors 0-6</p>
+                      </div>
+                    </div>
+                    <p className="mt-3 text-xs text-slate-500">
+                      Based on {questionRatings.metrics.enps.totalResponses} filtered responses.
+                    </p>
+                  </>
+                ) : (
+                  <p className="mt-5 text-sm font-medium text-slate-500">
+                    {questionRatings.metrics.enps.status === "suppressed"
+                      ? `Protected until at least ${questionRatings.threshold} people in this filtered group respond.`
+                      : questionRatings.metrics.enps.status === "no_responses"
+                        ? "No responses yet for this filtered group."
+                        : "This survey does not include a 0-10 recommendation question."}
+                  </p>
+                )}
+              </div>
+
+              <div className="p-6">
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div>
+                    <h3 className="font-semibold text-slate-900">Best Friend at Work</h3>
+                    <p className="mt-1 max-w-xl text-sm text-slate-500">
+                      {questionRatings.metrics.bestFriend.questionText || "No best-friend-at-work question is configured for this survey."}
+                    </p>
+                  </div>
+                  {questionRatings.metrics.bestFriend.status === "available" &&
+                  questionRatings.metrics.bestFriend.yesPercent !== null ? (
+                    <div className="text-right">
+                      <p className="text-4xl font-bold text-secondary">{questionRatings.metrics.bestFriend.yesPercent}%</p>
+                      <p className="text-xs font-medium uppercase text-slate-500">Answered Yes</p>
+                    </div>
+                  ) : null}
+                </div>
+
+                {questionRatings.metrics.bestFriend.status === "available" ? (
+                  <>
+                    <div className="mt-5 grid grid-cols-3 divide-x divide-slate-200 border-y border-slate-200 py-3 text-center">
+                      <div className="px-2">
+                        <p className="text-lg font-semibold text-emerald-700">{questionRatings.metrics.bestFriend.yesPercent}%</p>
+                        <p className="text-xs text-slate-500">Yes</p>
+                      </div>
+                      <div className="px-2">
+                        <p className="text-lg font-semibold text-slate-700">{questionRatings.metrics.bestFriend.noPercent}%</p>
+                        <p className="text-xs text-slate-500">No</p>
+                      </div>
+                      <div className="px-2">
+                        <p className="text-lg font-semibold text-slate-500">{questionRatings.metrics.bestFriend.preferNotToSayPercent}%</p>
+                        <p className="text-xs text-slate-500">Prefer not to say</p>
+                      </div>
+                    </div>
+                    <p className="mt-3 text-xs text-slate-500">
+                      Based on {questionRatings.metrics.bestFriend.totalResponses} filtered responses.
+                    </p>
+                  </>
+                ) : (
+                  <p className="mt-5 text-sm font-medium text-slate-500">
+                    {questionRatings.metrics.bestFriend.status === "suppressed"
+                      ? `Protected until at least ${questionRatings.threshold} people in this filtered group respond.`
+                      : questionRatings.metrics.bestFriend.status === "no_responses"
+                        ? "No responses yet for this filtered group."
+                        : "This survey does not include the best-friend-at-work question."}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="border-t border-blue-200 bg-blue-50 px-6 py-5">
+              <h3 className="font-semibold text-blue-950">How the scores work</h3>
+              <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-blue-900">
+                <li>Most rating questions use a 1-5 scale. Higher averages indicate a more favourable response.</li>
+                <li>The workplace recommendation question uses a 0-10 scale, so averages above 5 are expected and are displayed as a score out of 10.</li>
+                <li>eNPS subtracts the percentage of Detractors (0-6) from Promoters (9-10). Passives (7-8) do not change the score. The result ranges from -100 to +100.</li>
+                <li>Table colours are normalized to each question&apos;s own scale and are visual guides, not eNPS categories.</li>
+              </ul>
+              <p className="mt-2 text-xs text-blue-800">
+                The metric panels use the selected survey, department, and location filters. Small groups remain protected.
+              </p>
+            </div>
+          </>
+        )}
 
         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 px-4 py-3 text-xs text-slate-500">
           <span>
