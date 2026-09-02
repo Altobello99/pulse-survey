@@ -2,6 +2,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { departmentedBambooEmployeeWhere } from "@/lib/access";
+import { ANONYMITY_THRESHOLD } from "@/lib/constants";
 
 export async function GET() {
   const session = await getServerSession(authOptions);
@@ -28,7 +29,20 @@ export async function GET() {
   const latestSurvey = await prisma.survey.findFirst({
     where: { status: { in: ["active", "closed"] } },
     orderBy: { startDate: "desc" },
+    select: {
+      id: true,
+      questions: {
+        where: { type: "rating" },
+        select: { id: true, options: true },
+      },
+    },
   });
+  const standardRatingQuestionIds = (latestSurvey?.questions || [])
+    .filter((question) => {
+      const scale = ratingOptions(question.options);
+      return Math.min(...scale) === 1 && Math.max(...scale) === 5;
+    })
+    .map((question) => question.id);
 
   const data = await Promise.all(
     departments.map(async (dept) => {
@@ -42,18 +56,30 @@ export async function GET() {
           })
         : 0;
 
-      // Average rating across all responses for this department
-      const ratingAnswers = await prisma.answer.findMany({
-        where: {
-          ratingValue: { not: null },
-          surveyResponse: { departmentId: dept.id },
-        },
-        select: { ratingValue: true },
-      });
+      const recentResponses = latestSurvey
+        ? await prisma.surveyResponse.count({
+            where: { surveyId: latestSurvey.id, departmentId: dept.id },
+          })
+        : 0;
+      const ratingAnswers = latestSurvey &&
+        recentResponses >= ANONYMITY_THRESHOLD &&
+        standardRatingQuestionIds.length > 0
+        ? await prisma.answer.findMany({
+            where: {
+              questionId: { in: standardRatingQuestionIds },
+              ratingValue: { not: null },
+              surveyResponse: {
+                surveyId: latestSurvey.id,
+                departmentId: dept.id,
+              },
+            },
+            select: { ratingValue: true },
+          })
+        : [];
 
       const avgRating = ratingAnswers.length
         ? ratingAnswers.reduce((sum, a) => sum + (a.ratingValue || 0), 0) / ratingAnswers.length
-        : 0;
+        : null;
 
       return {
         id: dept.id,
@@ -62,10 +88,26 @@ export async function GET() {
         participationRate: employeeCount
           ? Math.round((recentCompletions / employeeCount) * 100)
           : 0,
-        avgRating: Math.round(avgRating * 10) / 10,
+        avgRating: avgRating === null ? null : Math.round(avgRating * 10) / 10,
+        ratingScaleMax: 5,
       };
     })
   );
 
   return Response.json({ data });
+}
+
+function ratingOptions(options: string | null) {
+  if (!options) return [1, 2, 3, 4, 5];
+
+  try {
+    const parsed = JSON.parse(options);
+    if (!Array.isArray(parsed)) return [1, 2, 3, 4, 5];
+    const values = parsed
+      .map((option) => Number(option))
+      .filter((option) => Number.isInteger(option));
+    return values.length ? values : [1, 2, 3, 4, 5];
+  } catch {
+    return [1, 2, 3, 4, 5];
+  }
 }

@@ -28,7 +28,8 @@ type DepartmentAnalytics = {
   name: string;
   employeeCount: number;
   participationRate: number;
-  avgRating: number;
+  avgRating: number | null;
+  ratingScaleMax: number;
 };
 
 type TrendPoint = {
@@ -797,7 +798,7 @@ export default function AdminDashboard() {
                   <YAxis />
                   <Tooltip />
                   <Bar dataKey="participationRate" name="Participation %" fill={COLORS.primary} radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="avgRating" name="Avg Rating" fill={COLORS.secondary} radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="avgRating" name="Avg Rating (out of 5)" fill={COLORS.secondary} radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>

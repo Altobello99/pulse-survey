@@ -16,7 +16,8 @@ interface DeptData {
   name: string;
   employeeCount: number;
   participationRate: number;
-  avgRating: number;
+  avgRating: number | null;
+  ratingScaleMax: number;
 }
 
 export default function DepartmentsPage() {
@@ -43,7 +44,12 @@ export default function DepartmentsPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-slate-900">Department Comparison</h1>
+      <div>
+        <h1 className="text-2xl font-bold text-slate-900">Department Comparison</h1>
+        <p className="mt-1 text-sm text-slate-500">
+          Average ratings use the current survey&apos;s standard 1-5 questions. The 0-10 recommendation question is reported separately as eNPS.
+        </p>
+      </div>
 
       {departments.length > 0 && (
         <div className="bg-white rounded-xl border border-slate-200 p-6">
@@ -55,7 +61,7 @@ export default function DepartmentsPage() {
                 <YAxis />
                 <Tooltip />
                 <Bar dataKey="participationRate" name="Participation %" fill={COLORS.primary} radius={[4, 4, 0, 0]} />
-                <Bar dataKey="avgRating" name="Avg Rating" fill={COLORS.secondary} radius={[4, 4, 0, 0]} />
+                <Bar dataKey="avgRating" name="Avg Rating (out of 5)" fill={COLORS.secondary} radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -69,7 +75,7 @@ export default function DepartmentsPage() {
               <th className="text-left px-6 py-3 font-medium text-slate-600">Department</th>
               <th className="text-left px-6 py-3 font-medium text-slate-600">Employees</th>
               <th className="text-left px-6 py-3 font-medium text-slate-600">Participation</th>
-              <th className="text-left px-6 py-3 font-medium text-slate-600">Avg Rating</th>
+              <th className="text-left px-6 py-3 font-medium text-slate-600">Avg Rating (out of 5)</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -89,8 +95,8 @@ export default function DepartmentsPage() {
                   </div>
                 </td>
                 <td className="px-6 py-4">
-                  <span className={`font-semibold ${dept.avgRating >= 4 ? "text-emerald-600" : dept.avgRating >= 3 ? "text-amber-600" : "text-red-600"}`}>
-                    {dept.avgRating || "N/A"}
+                  <span className={`font-semibold ${dept.avgRating === null ? "text-slate-400" : dept.avgRating >= 4 ? "text-emerald-600" : dept.avgRating >= 3 ? "text-amber-600" : "text-red-600"}`}>
+                    {dept.avgRating === null ? "N/A" : `${dept.avgRating.toFixed(1)} / ${dept.ratingScaleMax}`}
                   </span>
                 </td>
               </tr>
