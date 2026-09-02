@@ -39,8 +39,14 @@ type TrendPoint = {
 };
 
 type ParticipationPoint = {
+  id: string;
+  title: string;
   date: string;
+  status: string;
+  completions: number;
+  total: number;
   rate: number;
+  hidden: boolean;
 };
 
 type FeedbackItem = {
@@ -52,7 +58,6 @@ type FeedbackItem = {
 type DashboardStats = {
   totalEmployees: number;
   activeSurveys: number;
-  avgParticipation: number;
 };
 
 type ApiResponse<T> = {
@@ -204,17 +209,9 @@ export default function AdminDashboard() {
         0
       );
       const activeSurveys = allSurveys.filter((survey) => survey.status === "active").length;
-      const avgParticipation =
-        participationData.length > 0
-          ? Math.round(
-              participationData.reduce((sum, point) => sum + point.rate, 0) /
-                participationData.length
-            )
-          : 0;
       setStats({
         totalEmployees,
         activeSurveys,
-        avgParticipation,
       });
 
       setLoading(false);
@@ -350,6 +347,37 @@ export default function AdminDashboard() {
         ? "text-red-600"
         : "text-slate-900"
     : "text-slate-500";
+  const selectedParticipation = participation.find(
+    (point) => point.id === selectedSurveyId
+  ) || participation[participation.length - 1] || null;
+  const statCards: Array<{
+    label: string;
+    value: string | number;
+    color: string;
+    detail?: string;
+  }> = [
+    {
+      label: "Eligible Employees",
+      value: stats?.totalEmployees ?? 0,
+      color: "text-slate-900",
+    },
+    {
+      label: "Active Surveys",
+      value: stats?.activeSurveys ?? 0,
+      color: "text-primary",
+    },
+    {
+      label: "Avg Participation",
+      value: `${selectedParticipation?.rate ?? 0}%`,
+      color: "text-secondary",
+      detail: `${selectedParticipation?.completions ?? 0} of ${selectedParticipation?.total ?? stats?.totalEmployees ?? 0} eligible employees completed`,
+    },
+    {
+      label: "eNPS (Selected View)",
+      value: enpsCardValue,
+      color: enpsCardColor,
+    },
+  ];
 
   if (loading) {
     return (
@@ -391,15 +419,13 @@ export default function AdminDashboard() {
 
       {/* Stat Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {[
-          { label: "Eligible Employees", value: stats?.totalEmployees ?? 0, color: "text-slate-900" },
-          { label: "Active Surveys", value: stats?.activeSurveys ?? 0, color: "text-primary" },
-          { label: "Avg Participation", value: `${stats?.avgParticipation ?? 0}%`, color: "text-secondary" },
-          { label: "eNPS (Selected View)", value: enpsCardValue, color: enpsCardColor },
-        ].map((s) => (
+        {statCards.map((s) => (
           <div key={s.label} className="bg-white rounded-xl border border-slate-200 p-6">
             <p className="text-sm text-slate-500 mb-1">{s.label}</p>
             <p className={`text-3xl font-bold capitalize ${s.color}`}>{s.value}</p>
+            {s.detail && (
+              <p className="mt-2 text-sm leading-5 text-slate-500">{s.detail}</p>
+            )}
           </div>
         ))}
       </div>
