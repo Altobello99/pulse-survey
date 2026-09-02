@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { DEMOGRAPHIC_OPTION_EMPLOYEE_THRESHOLD } from "@/lib/constants";
 import { departmentedBambooEmployeeWhere } from "@/lib/access";
+import { formatShiftLine } from "@/lib/team-groups";
 
 export type EligibleDepartmentOption = {
   id: string;
@@ -102,13 +103,6 @@ export async function getEligibleSurveyDemographics() {
         employeeCount: row._count._all,
       })),
   };
-}
-
-function formatShiftLine(name: string) {
-  const match = name.match(/line\s*([123])/i);
-  if (!match) return name;
-  const line = match[1];
-  return line === "3" ? `Line ${line} - Nights` : `Line ${line}`;
 }
 
 export async function getAnonymousFallbackDepartmentId() {

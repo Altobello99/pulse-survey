@@ -11,6 +11,7 @@ import {
   getScopedResponseWhere,
   type AccessFilters,
 } from "@/lib/access";
+import { groupTeams } from "@/lib/team-groups";
 import type { Prisma } from "@/generated/prisma/client";
 
 type FilterOption = {
@@ -28,7 +29,7 @@ export async function GET(
   }
 
   const { surveyId } = await params;
-  const filters = getFilters(request);
+  const filters = await getFilters(request);
 
   const survey = await prisma.survey.findUnique({
     where: { id: surveyId },
@@ -224,21 +225,29 @@ function ratingOptions(question: { options: string | null }) {
   }
 }
 
-function getFilters(request: NextRequest): AccessFilters {
+async function getFilters(request: NextRequest): Promise<AccessFilters> {
   const params = request.nextUrl.searchParams;
+  const teamGroup = params.get("teamGroup");
   return {
     departmentId: params.get("departmentId"),
     division: params.get("division"),
     teamId: params.get("teamId"),
+    teamIds: teamGroup ? await getTeamIdsForGroup(teamGroup) : null,
     location: params.get("location"),
   };
+}
+
+async function getTeamIdsForGroup(teamGroupId: string) {
+  const teams = await prisma.team.findMany({ select: { id: true, name: true } });
+  return groupTeams(teams).find((group) => group.id === teamGroupId)?.teamIds || [];
 }
 
 function applyEmployeeFilters(where: Prisma.UserWhereInput, filters: AccessFilters) {
   const clauses: Prisma.UserWhereInput[] = [where];
   if (filters.departmentId) clauses.push({ departmentId: filters.departmentId });
   if (filters.division) clauses.push({ division: filters.division });
-  if (filters.teamId) clauses.push({ teamId: filters.teamId });
+  if (filters.teamIds) clauses.push({ teamId: { in: filters.teamIds } });
+  else if (filters.teamId) clauses.push({ teamId: filters.teamId });
   if (filters.location) clauses.push({ location: filters.location });
   return clauses.length === 1 ? where : { AND: clauses };
 }
@@ -256,18 +265,19 @@ async function getFilterOptions(user: Session["user"]) {
     orderBy: { name: "asc" },
   });
 
+  const teamGroups = groupTeams(
+    employees
+      .map((employee) => employee.team)
+      .filter((team): team is FilterOption => Boolean(team))
+  );
+
   return {
     departments: uniqueBy(
       employees.map((employee) => employee.department).filter(Boolean),
       "id"
     ),
     divisions: [...new Set(employees.map((employee) => employee.division).filter(Boolean))],
-    teams: uniqueBy(
-      employees
-        .map((employee) => employee.team)
-        .filter((team): team is FilterOption => Boolean(team)),
-      "id"
-    ),
+    teams: teamGroups.map((group) => ({ id: group.id, name: group.name })),
     locations: [...new Set(employees.map((employee) => employee.location).filter(Boolean))],
   };
 }
@@ -344,16 +354,16 @@ async function buildTeamBreakdown(
   });
 
   return Promise.all(
-    teams.map(async (team) => {
+    groupTeams(teams).map(async (teamGroup) => {
       const scopedResponseWhere = {
-        AND: [responseWhere, { teamId: team.id }],
+        AND: [responseWhere, { teamId: { in: teamGroup.teamIds } }],
       } satisfies Prisma.SurveyResponseWhereInput;
       return buildBreakdownRow(
         surveyId,
-        team.id,
-        team.name,
+        teamGroup.id,
+        teamGroup.name,
         scopedResponseWhere,
-        { AND: [employeeWhere, { teamId: team.id }] },
+        { AND: [employeeWhere, { teamId: { in: teamGroup.teamIds } }] },
         standardRatingQuestionIds
       );
     })

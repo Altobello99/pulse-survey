@@ -5,6 +5,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { ANONYMITY_THRESHOLD } from "@/lib/constants";
 import { departmentedBambooEmployeeWhere } from "@/lib/access";
+import { groupTeams, teamGroupIdentity } from "@/lib/team-groups";
 import type { Prisma } from "@/generated/prisma/client";
 
 type ReportType =
@@ -40,11 +41,20 @@ type EmployeeForReport = Prisma.UserGetPayload<{
   };
 }>;
 type CompletionForReport = { userId: string; completedAt: Date };
+type ReportFilters = {
+  departmentId?: string | null;
+  division?: string | null;
+  teamId?: string | null;
+  teamGroup?: string | null;
+  teamGroupName?: string | null;
+  teamIds?: string[] | null;
+  location?: string | null;
+};
 type ReportContext = {
   reportType: ReportType;
   reportLabel: string;
   survey: SurveyForReport;
-  filters: { departmentId?: string | null; division?: string | null; teamId?: string | null; location?: string | null };
+  filters: ReportFilters;
   scope: "company" | "filtered";
   scopeLabel: string;
   generatedAt: Date;
@@ -114,15 +124,21 @@ async function buildReportContext(
   reportType: ReportType
 ): Promise<ReportContext | null> {
   const scope = request.nextUrl.searchParams.get("scope") === "company" ? "company" : "filtered";
-  const filters =
+  const filters: ReportFilters =
     scope === "company"
       ? {}
       : {
           departmentId: request.nextUrl.searchParams.get("departmentId"),
           division: request.nextUrl.searchParams.get("division"),
           teamId: request.nextUrl.searchParams.get("teamId"),
+          teamGroup: request.nextUrl.searchParams.get("teamGroup"),
           location: request.nextUrl.searchParams.get("location"),
         };
+  if (filters.teamGroup) {
+    const selectedTeamGroup = await getTeamGroup(filters.teamGroup);
+    filters.teamIds = selectedTeamGroup?.teamIds || [];
+    filters.teamGroupName = selectedTeamGroup?.name || filters.teamGroup;
+  }
 
   const survey = await prisma.survey.findUnique({
     where: { id: surveyId },
@@ -592,7 +608,7 @@ function groupSurveyData(context: ReportContext, groupBy: "department" | "divisi
       responses: context.responses.filter((response) => {
         if (groupBy === "department") return response.departmentId === group.id;
         if (groupBy === "division") return (response.division || "Unassigned") === group.id;
-        if (groupBy === "team") return response.teamId === group.id;
+        if (groupBy === "team") return teamGroupIdentity(response.team?.name).id === group.id;
         return (response.location || "Unassigned") === group.id;
       }),
     };
@@ -603,13 +619,14 @@ function groupEmployees(context: ReportContext, groupBy: "department" | "divisio
   const groups = new Map<string, { id: string; name: string; employees: typeof context.employees }>();
 
   for (const employee of context.employees) {
+    const teamGroup = teamGroupIdentity(employee.team?.name);
     const id =
       groupBy === "department"
         ? employee.departmentId
         : groupBy === "division"
           ? employee.division || "Unassigned"
           : groupBy === "team"
-            ? employee.teamId || "Unassigned"
+            ? teamGroup.id
             : employee.location || "Unassigned";
     const name =
       groupBy === "department"
@@ -617,7 +634,7 @@ function groupEmployees(context: ReportContext, groupBy: "department" | "divisio
         : groupBy === "division"
           ? employee.division || "Unassigned"
           : groupBy === "team"
-            ? employee.team?.name || "Unassigned"
+            ? teamGroup.name
             : employee.location || "Unassigned";
 
     const group = groups.get(id) || { id, name, employees: [] as typeof context.employees };
@@ -688,22 +705,29 @@ function textAnswers(answers: ReturnType<typeof answersForQuestion>) {
     .filter((value): value is string => Boolean(value && value.trim()));
 }
 
-function applyResponseFilters(where: Prisma.SurveyResponseWhereInput, filters: { departmentId?: string | null; division?: string | null; teamId?: string | null; location?: string | null }) {
+function applyResponseFilters(where: Prisma.SurveyResponseWhereInput, filters: ReportFilters) {
   const clauses: Prisma.SurveyResponseWhereInput[] = [where];
   if (filters.departmentId) clauses.push({ departmentId: filters.departmentId });
   if (filters.division) clauses.push({ division: filters.division });
-  if (filters.teamId) clauses.push({ teamId: filters.teamId });
+  if (filters.teamIds) clauses.push({ teamId: { in: filters.teamIds } });
+  else if (filters.teamId) clauses.push({ teamId: filters.teamId });
   if (filters.location) clauses.push({ location: filters.location });
   return clauses.length === 1 ? where : { AND: clauses };
 }
 
-function applyEmployeeFilters(where: Prisma.UserWhereInput, filters: { departmentId?: string | null; division?: string | null; teamId?: string | null; location?: string | null }) {
+function applyEmployeeFilters(where: Prisma.UserWhereInput, filters: ReportFilters) {
   const clauses: Prisma.UserWhereInput[] = [where];
   if (filters.departmentId) clauses.push({ departmentId: filters.departmentId });
   if (filters.division) clauses.push({ division: filters.division });
-  if (filters.teamId) clauses.push({ teamId: filters.teamId });
+  if (filters.teamIds) clauses.push({ teamId: { in: filters.teamIds } });
+  else if (filters.teamId) clauses.push({ teamId: filters.teamId });
   if (filters.location) clauses.push({ location: filters.location });
   return clauses.length === 1 ? where : { AND: clauses };
+}
+
+async function getTeamGroup(teamGroupId: string) {
+  const teams = await prisma.team.findMany({ select: { id: true, name: true } });
+  return groupTeams(teams).find((group) => group.id === teamGroupId);
 }
 
 function toXlsx(sheets: ReportSheet[]) {
@@ -751,12 +775,16 @@ function makeFilename(surveyTitle: string, reportType: ReportType, format: "xlsx
   return `${surveyTitle}_${reportType}`.replace(/[^a-z0-9]+/gi, "_").replace(/^_+|_+$/g, "").toLowerCase() + `.${format}`;
 }
 
-function buildScopeLabel(scope: string, filters: { departmentId?: string | null; division?: string | null; teamId?: string | null; location?: string | null }) {
+function buildScopeLabel(scope: string, filters: ReportFilters) {
   if (scope === "company") return "Company-wide";
   const parts = [
     filters.departmentId ? `Department ${filters.departmentId}` : "",
     filters.division ? `Division ${filters.division}` : "",
-    filters.teamId ? `Team ${filters.teamId}` : "",
+    filters.teamGroup
+      ? `Shift / Line ${filters.teamGroupName || filters.teamGroup}`
+      : filters.teamId
+        ? `Team ${filters.teamId}`
+        : "",
     filters.location ? `Location ${filters.location}` : "",
   ].filter(Boolean);
   return parts.length ? `Current filters: ${parts.join(", ")}` : "Company-wide";

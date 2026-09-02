@@ -99,21 +99,21 @@ export default function SurveyResultsPage({
   const [analyzing, setAnalyzing] = useState(false);
   const [departmentId, setDepartmentId] = useState("");
   const [division, setDivision] = useState("");
-  const [teamId, setTeamId] = useState("");
+  const [teamGroup, setTeamGroup] = useState("");
   const [location, setLocation] = useState("");
 
   const fetchResults = useCallback(() => {
     const params = new URLSearchParams();
     if (departmentId) params.set("departmentId", departmentId);
     if (division) params.set("division", division);
-    if (teamId) params.set("teamId", teamId);
+    if (teamGroup) params.set("teamGroup", teamGroup);
     if (location) params.set("location", location);
 
     fetch(`/api/surveys/${surveyId}/results${params.toString() ? `?${params}` : ""}`)
       .then((r) => r.json())
       .then((d) => setResult(d.data))
       .finally(() => setLoading(false));
-  }, [surveyId, departmentId, division, teamId, location]);
+  }, [surveyId, departmentId, division, teamGroup, location]);
 
   useEffect(() => {
     fetchResults();
@@ -148,14 +148,14 @@ export default function SurveyResultsPage({
   const themes: string[] = sentiment ? JSON.parse(sentiment.themes) : [];
   const insights: string[] = sentiment ? JSON.parse(sentiment.insights) : [];
   const groupedQuestionResults = groupQuestionResults(result.questionResults);
-  const hasActiveFilters = Boolean(departmentId || division || teamId || location);
+  const hasActiveFilters = Boolean(departmentId || division || teamGroup || location);
 
   function reportHref(reportType: string, format: "xlsx" | "csv", scope: "filtered" | "company") {
     const params = new URLSearchParams({ format, scope });
     if (scope === "filtered") {
       if (departmentId) params.set("departmentId", departmentId);
       if (division) params.set("division", division);
-      if (teamId) params.set("teamId", teamId);
+      if (teamGroup) params.set("teamGroup", teamGroup);
       if (location) params.set("location", location);
     }
     return `/api/surveys/${surveyId}/reports/${reportType}?${params.toString()}`;
@@ -215,8 +215,8 @@ export default function SurveyResultsPage({
               ))}
             </select>
             <select
-              value={teamId}
-              onChange={(e) => setTeamId(e.target.value)}
+              value={teamGroup}
+              onChange={(e) => setTeamGroup(e.target.value)}
               className="px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
             >
               <option value="">All shifts / lines</option>
@@ -239,7 +239,7 @@ export default function SurveyResultsPage({
               onClick={() => {
                 setDepartmentId("");
                 setDivision("");
-                setTeamId("");
+                setTeamGroup("");
                 setLocation("");
               }}
               className="px-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-700 hover:bg-slate-50"

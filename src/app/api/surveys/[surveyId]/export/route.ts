@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getScopedResponseWhere } from "@/lib/access";
+import { groupTeams, teamGroupIdentity } from "@/lib/team-groups";
 
 // Export survey results as CSV (anonymized)
 export async function GET(
@@ -15,9 +16,12 @@ export async function GET(
   }
 
   const { surveyId } = await params;
+  const teamGroup = request.nextUrl.searchParams.get("teamGroup");
+  const teamIds = teamGroup ? await getTeamIdsForGroup(teamGroup) : null;
   const responseWhere = await getScopedResponseWhere(session.user, surveyId, {
     departmentId: request.nextUrl.searchParams.get("departmentId"),
     teamId: request.nextUrl.searchParams.get("teamId"),
+    teamIds,
     location: request.nextUrl.searchParams.get("location"),
   });
 
@@ -54,7 +58,7 @@ export async function GET(
     const vals: string[] = [
       String(idx + 1),
       resp.department?.name || "Anonymous",
-      resp.team?.name || "",
+      resp.team ? teamGroupIdentity(resp.team.name).name : "",
       resp.location || "",
       new Date(resp.submittedAt).toISOString().replace(/:\d{2}\.\d{3}Z/, ":00"),
     ];
@@ -95,4 +99,9 @@ export async function GET(
       "Content-Disposition": `attachment; filename="${filename}"`,
     },
   });
+}
+
+async function getTeamIdsForGroup(teamGroupId: string) {
+  const teams = await prisma.team.findMany({ select: { id: true, name: true } });
+  return groupTeams(teams).find((group) => group.id === teamGroupId)?.teamIds || [];
 }

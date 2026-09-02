@@ -13,6 +13,7 @@ export type AccessFilters = {
   departmentId?: string | null;
   division?: string | null;
   teamId?: string | null;
+  teamIds?: string[] | null;
   location?: string | null;
 };
 
@@ -164,7 +165,8 @@ function applyFilters(where: Prisma.SurveyResponseWhereInput, filters: AccessFil
 
   if (filters.departmentId) clauses.push({ departmentId: filters.departmentId });
   if (filters.division) clauses.push({ division: filters.division });
-  if (filters.teamId) clauses.push({ teamId: filters.teamId });
+  if (filters.teamIds) clauses.push({ teamId: { in: filters.teamIds } });
+  else if (filters.teamId) clauses.push({ teamId: filters.teamId });
   if (filters.location) clauses.push({ location: filters.location });
 
   return clauses.length === 1 ? where : { AND: clauses };
