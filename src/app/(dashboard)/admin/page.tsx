@@ -15,42 +15,144 @@ import {
 import { COLORS } from "@/lib/constants";
 import { formatDateShort, sentimentColor } from "@/lib/utils";
 
+type SurveySummary = {
+  id: string;
+  title: string;
+  status: string;
+  startDate: string;
+  endDate: string;
+};
+
+type DepartmentAnalytics = {
+  id: string;
+  name: string;
+  employeeCount: number;
+  participationRate: number;
+  avgRating: number;
+};
+
+type TrendPoint = {
+  date: string;
+  score: number;
+  sentiment: string;
+};
+
+type ParticipationPoint = {
+  date: string;
+  rate: number;
+};
+
+type FeedbackItem = {
+  id: string;
+  message: string;
+  sentiment: string | null;
+};
+
+type DashboardStats = {
+  totalEmployees: number;
+  activeSurveys: number;
+  avgParticipation: number;
+  sentimentScore: number | null;
+  sentimentLabel: string;
+};
+
+type ApiResponse<T> = {
+  data?: T;
+  error?: string;
+};
+
+type QuestionRatingsData = {
+  survey: { id: string; title: string };
+  questions: Array<{
+    id: string;
+    text: string;
+    order: number;
+    scaleMin: number;
+    scaleMax: number;
+  }>;
+  departments: Array<{
+    id: string;
+    name: string;
+    responseCount: number | null;
+    status: "no_responses" | "suppressed" | "available";
+    ratings: Array<{ questionId: string; average: number | null }>;
+  }>;
+  threshold: number;
+};
+
+function ratingTone(average: number, minimum: number, maximum: number) {
+  const range = maximum - minimum;
+  const normalized = range > 0 ? (average - minimum) / range : 0;
+
+  if (normalized >= 0.75) return "border-emerald-200 bg-emerald-50 text-emerald-800";
+  if (normalized >= 0.5) return "border-amber-200 bg-amber-50 text-amber-800";
+  return "border-rose-200 bg-rose-50 text-rose-800";
+}
+
+async function fetchData<T>(url: string): Promise<ApiResponse<T>> {
+  const response = await fetch(url);
+  const payload = await response.json() as ApiResponse<T>;
+  if (!response.ok) throw new Error(payload.error || "Unable to load dashboard data");
+  return payload;
+}
+
 export default function AdminDashboard() {
-  const [stats, setStats] = useState<any>(null);
-  const [departments, setDepartments] = useState<any[]>([]);
-  const [trends, setTrends] = useState<any[]>([]);
-  const [participation, setParticipation] = useState<any[]>([]);
-  const [feedback, setFeedback] = useState<any[]>([]);
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [departments, setDepartments] = useState<DepartmentAnalytics[]>([]);
+  const [trends, setTrends] = useState<TrendPoint[]>([]);
+  const [participation, setParticipation] = useState<ParticipationPoint[]>([]);
+  const [feedback, setFeedback] = useState<FeedbackItem[]>([]);
+  const [surveys, setSurveys] = useState<SurveySummary[]>([]);
+  const [selectedSurveyId, setSelectedSurveyId] = useState("");
+  const [questionRatings, setQuestionRatings] = useState<QuestionRatingsData | null>(null);
+  const [questionRatingsError, setQuestionRatingsError] = useState<{
+    surveyId: string;
+    message: string;
+  } | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     Promise.all([
-      fetch("/api/analytics/departments").then((r) => r.json()),
-      fetch("/api/analytics/trends").then((r) => r.json()),
-      fetch("/api/analytics/participation").then((r) => r.json()),
-      fetch("/api/feedback").then((r) => r.json()),
-      fetch("/api/surveys").then((r) => r.json()),
+      fetchData<DepartmentAnalytics[]>("/api/analytics/departments"),
+      fetchData<TrendPoint[]>("/api/analytics/trends"),
+      fetchData<ParticipationPoint[]>("/api/analytics/participation"),
+      fetchData<FeedbackItem[]>("/api/feedback"),
+      fetchData<SurveySummary[]>("/api/surveys"),
     ]).then(([depts, trnds, part, fb, surveys]) => {
-      setDepartments(depts.data || []);
-      setTrends(trnds.data || []);
-      setParticipation(part.data || []);
-      setFeedback((fb.data || []).slice(0, 5));
+      const departmentData = depts.data || [];
+      const trendData = trnds.data || [];
+      const participationData = part.data || [];
+      const feedbackData = fb.data || [];
 
-      const allSurveys = surveys.data || [];
-      const totalEmployees = (depts.data || []).reduce(
-        (s: number, d: any) => s + d.employeeCount,
+      setDepartments(departmentData);
+      setTrends(trendData);
+      setParticipation(participationData);
+      setFeedback(feedbackData.slice(0, 5));
+
+      const allSurveys: SurveySummary[] = surveys.data || [];
+      setSurveys(allSurveys);
+      const now = new Date();
+      const defaultSurvey = allSurveys.find(
+        (survey) =>
+          survey.status === "active" &&
+          new Date(survey.startDate) <= now &&
+          new Date(survey.endDate) >= now
+      ) || allSurveys.find((survey) => survey.status === "active") || allSurveys[0];
+      setSelectedSurveyId(defaultSurvey?.id || "");
+      const totalEmployees = departmentData.reduce(
+        (sum, department) => sum + department.employeeCount,
         0
       );
-      const activeSurveys = allSurveys.filter((s: any) => s.status === "active").length;
+      const activeSurveys = allSurveys.filter((survey) => survey.status === "active").length;
       const avgParticipation =
-        (part.data || []).length > 0
+        participationData.length > 0
           ? Math.round(
-              (part.data || []).reduce((s: number, p: any) => s + p.rate, 0) /
-                (part.data || []).length
+              participationData.reduce((sum, point) => sum + point.rate, 0) /
+                participationData.length
             )
           : 0;
-      const latestSentiment = (trnds.data || []).length > 0
-        ? trnds.data[trnds.data.length - 1]
+      const latestSentiment = trendData.length > 0
+        ? trendData[trendData.length - 1]
         : null;
 
       setStats({
@@ -62,8 +164,46 @@ export default function AdminDashboard() {
       });
 
       setLoading(false);
-    });
+    }).catch(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    if (!selectedSurveyId) return;
+
+    let cancelled = false;
+
+    fetch(`/api/analytics/question-ratings?surveyId=${encodeURIComponent(selectedSurveyId)}`)
+      .then(async (response) => {
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.error || "Unable to load question ratings");
+        return payload;
+      })
+      .then((payload) => {
+        if (!cancelled) {
+          setQuestionRatings(payload.data || null);
+          setQuestionRatingsError(null);
+        }
+      })
+      .catch((error: Error) => {
+        if (!cancelled) {
+          setQuestionRatings(null);
+          setQuestionRatingsError({ surveyId: selectedSurveyId, message: error.message });
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedSurveyId]);
+
+  const selectedSurveyError = questionRatingsError?.surveyId === selectedSurveyId
+    ? questionRatingsError.message
+    : "";
+  const questionRatingsLoading = Boolean(
+    selectedSurveyId &&
+    questionRatings?.survey.id !== selectedSurveyId &&
+    !selectedSurveyError
+  );
 
   if (loading) {
     return (
@@ -125,6 +265,107 @@ export default function AdminDashboard() {
           </div>
         ))}
       </div>
+
+      <section className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+        <div className="flex flex-col gap-3 p-6 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-slate-900">Question Ratings by Department</h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Department ratings appear after at least {questionRatings?.threshold ?? 3} employees respond.
+            </p>
+          </div>
+          <label className="block min-w-0 sm:w-72">
+            <span className="mb-1 block text-xs font-medium uppercase text-slate-500">Survey</span>
+            <select
+              value={selectedSurveyId}
+              onChange={(event) => setSelectedSurveyId(event.target.value)}
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+            >
+              {surveys.map((survey) => (
+                <option key={survey.id} value={survey.id}>
+                  {survey.title} ({survey.status})
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        {questionRatingsLoading ? (
+          <div className="border-t border-slate-200 p-6" aria-live="polite">
+            <div className="h-32 animate-pulse rounded-lg bg-slate-100" />
+          </div>
+        ) : selectedSurveyError ? (
+          <p className="border-t border-slate-200 p-6 text-sm text-red-600">{selectedSurveyError}</p>
+        ) : !selectedSurveyId ? (
+          <p className="border-t border-slate-200 p-6 text-sm text-slate-500">No surveys are available.</p>
+        ) : questionRatings && questionRatings.questions.length > 0 ? (
+          <div className="overflow-x-auto border-t border-slate-200">
+            <table className="w-full min-w-max border-collapse text-sm">
+              <thead className="bg-slate-50">
+                <tr>
+                  <th className="sticky left-0 z-10 min-w-80 max-w-md border-b border-r border-slate-200 bg-slate-50 px-4 py-3 text-left font-semibold text-slate-700">
+                    Rating question
+                  </th>
+                  {questionRatings.departments.map((department) => (
+                    <th
+                      key={department.id}
+                      className="min-w-40 border-b border-r border-slate-200 px-4 py-3 text-center font-semibold text-slate-700 last:border-r-0"
+                    >
+                      <span className="block">{department.name}</span>
+                      <span className="mt-0.5 block text-xs font-normal text-slate-500">
+                        {department.status === "available"
+                          ? `${department.responseCount} responses`
+                          : department.status === "suppressed"
+                            ? "Protected"
+                            : "No responses"}
+                      </span>
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {questionRatings.questions.map((question) => (
+                  <tr key={question.id} className="even:bg-slate-50/50">
+                    <th className="sticky left-0 z-10 max-w-md border-b border-r border-slate-200 bg-white px-4 py-4 text-left align-top font-medium text-slate-800">
+                      <span className="mb-1 block text-xs font-semibold text-primary">Question {question.order + 1}</span>
+                      {question.text}
+                    </th>
+                    {questionRatings.departments.map((department) => {
+                      const rating = department.ratings.find((item) => item.questionId === question.id);
+                      return (
+                        <td
+                          key={department.id}
+                          className="border-b border-r border-slate-200 px-4 py-4 text-center last:border-r-0"
+                        >
+                          {rating?.average !== null && rating?.average !== undefined ? (
+                            <span
+                              className={`inline-flex min-w-20 justify-center rounded-md border px-2.5 py-1.5 font-semibold ${ratingTone(
+                                rating.average,
+                                question.scaleMin,
+                                question.scaleMax
+                              )}`}
+                            >
+                              {rating.average.toFixed(1)} / {question.scaleMax}
+                            </span>
+                          ) : (
+                            <span className="text-xs font-medium text-slate-400">
+                              {department.status === "suppressed" ? "Protected" : "N/A"}
+                            </span>
+                          )}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="border-t border-slate-200 p-6 text-sm text-slate-500">
+            This survey has no rating questions.
+          </p>
+        )}
+      </section>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Department Comparison */}
@@ -216,7 +457,7 @@ export default function AdminDashboard() {
         </div>
         {feedback.length > 0 ? (
           <div className="space-y-3">
-            {feedback.map((fb: any) => (
+            {feedback.map((fb) => (
               <div key={fb.id} className="p-3 bg-slate-50 rounded-lg flex items-start gap-3">
                 <span className={`shrink-0 mt-0.5 px-2 py-0.5 rounded-full text-xs font-medium ${sentimentColor(fb.sentiment || "neutral")}`}>
                   {fb.sentiment || "pending"}
