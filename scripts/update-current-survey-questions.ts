@@ -60,7 +60,7 @@ const questions: QuestionInput[] = [
   },
   {
     section: "Manager Support",
-    text: "How would you rate your working relationship with your manager?",
+    text: "I have an effective working relationship with my manager.",
     type: "rating",
   },
   {
@@ -104,6 +104,16 @@ async function main() {
   if (!survey) throw new Error(`Active survey not found: ${surveyTitle}`);
 
   const desiredByText = new Map(questions.map((question) => [question.text, question]));
+  const legacyTextByCurrentText = new Map<string, string>([
+    [
+      "What one thing would help you or your team drive better results?",
+      "What one thing would help you or your team drive better results this quarter?",
+    ],
+    [
+      "I have an effective working relationship with my manager.",
+      "How would you rate your working relationship with your manager?",
+    ],
+  ]);
 
   for (const existing of survey.questions) {
     if (desiredByText.has(existing.text)) continue;
@@ -118,13 +128,10 @@ async function main() {
   }
 
   for (const [order, question] of questions.entries()) {
-    const existing = survey.questions.find((item) => item.text === question.text) ||
-      (question.text === "What one thing would help you or your team drive better results?"
-        ? survey.questions.find(
-            (item) =>
-              item.text === "What one thing would help you or your team drive better results this quarter?"
-          )
-        : undefined);
+    const legacyText = legacyTextByCurrentText.get(question.text);
+    const existing =
+      survey.questions.find((item) => item.text === question.text) ||
+      survey.questions.find((item) => item.text === legacyText);
     const data = {
       section: question.section,
       text: question.text,

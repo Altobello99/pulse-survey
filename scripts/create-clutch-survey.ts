@@ -61,7 +61,7 @@ const questions: QuestionInput[] = [
   },
   {
     section: "Manager Support",
-    text: "How would you rate your working relationship with your manager?",
+    text: "I have an effective working relationship with my manager.",
     type: "rating",
   },
   {
