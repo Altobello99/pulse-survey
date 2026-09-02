@@ -23,6 +23,8 @@ interface QuestionResult {
   type: string;
   resultType: string;
   average?: number;
+  scaleMin?: number;
+  scaleMax?: number;
   distribution?: { rating?: number; option?: string; count: number }[];
   responses?: string[];
   rawResponsesHidden?: boolean;
@@ -44,7 +46,8 @@ interface DeptBreakdown {
   responses: number;
   completions: number;
   participationRate: number;
-  avgRating: number;
+  avgRating: number | null;
+  ratingScaleMax: number;
   suppressed?: boolean;
 }
 
@@ -60,6 +63,8 @@ interface ResultData {
   totalResponses: number;
   totalEmployees: number;
   completions: number;
+  averageRating: number | null;
+  ratingScaleMax: number;
   sentiment: SentimentData | null;
   departmentBreakdown: DeptBreakdown[];
   divisionBreakdown: DeptBreakdown[];
@@ -306,7 +311,7 @@ export default function SurveyResultsPage({
       )}
 
       {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <div className="bg-white rounded-xl border border-slate-200 p-6">
           <p className="text-sm text-slate-500 mb-1">Total Responses</p>
           <p className="text-3xl font-bold text-slate-900">{result.totalResponses}</p>
@@ -314,6 +319,16 @@ export default function SurveyResultsPage({
         <div className="bg-white rounded-xl border border-slate-200 p-6">
           <p className="text-sm text-slate-500 mb-1">Participation Rate</p>
           <p className="text-3xl font-bold text-primary">{result.participationRate}%</p>
+          <p className="mt-2 text-sm text-slate-500">
+            {result.completions} of {result.totalEmployees} eligible employees completed
+          </p>
+        </div>
+        <div className="bg-white rounded-xl border border-slate-200 p-6">
+          <p className="text-sm text-slate-500 mb-1">Average Rating</p>
+          <p className="text-3xl font-bold text-secondary">
+            {formatRating(result.averageRating, result.ratingScaleMax)}
+          </p>
+          <p className="mt-2 text-sm text-slate-500">Standard 1-5 questions</p>
         </div>
         <div className="bg-white rounded-xl border border-slate-200 p-6">
           <p className="text-sm text-slate-500 mb-1">Overall Sentiment</p>
@@ -368,7 +383,7 @@ export default function SurveyResultsPage({
                 <th className="text-left py-2 font-medium text-slate-600">Employees</th>
                 <th className="text-left py-2 font-medium text-slate-600">Responses</th>
                 <th className="text-left py-2 font-medium text-slate-600">Participation</th>
-                <th className="text-left py-2 font-medium text-slate-600">Avg Rating</th>
+                <th className="text-left py-2 font-medium text-slate-600">Avg Rating (out of 5)</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -387,8 +402,8 @@ export default function SurveyResultsPage({
                   </td>
                   <td className="py-3">
                     {!dept.suppressed ? (
-                      <span className={`font-semibold ${dept.avgRating >= 4 ? "text-emerald-600" : dept.avgRating >= 3 ? "text-amber-600" : "text-red-600"}`}>
-                        {dept.avgRating || "N/A"}
+                      <span className={`font-semibold ${ratingColor(dept.avgRating)}`}>
+                        {formatRating(dept.avgRating, dept.ratingScaleMax)}
                       </span>
                     ) : (
                       <span className="text-xs text-slate-400 italic">Too few responses</span>
@@ -430,8 +445,10 @@ export default function SurveyResultsPage({
                   q.total > 0 && q.distribution ? (
                     <div className="flex items-center gap-8">
                       <div className="text-center">
-                        <p className="text-4xl font-bold text-primary">{q.average}</p>
-                        <p className="text-xs text-slate-500">avg of {q.total}</p>
+                        <p className="text-4xl font-bold text-primary">
+                          {formatRating(q.average, q.scaleMax || 5)}
+                        </p>
+                        <p className="text-xs text-slate-500">average from {q.total} responses</p>
                       </div>
                       <div className="min-w-0 flex-1 h-48">
                         <ResponsiveContainer width="100%" height="100%" minWidth={0}>
@@ -547,7 +564,9 @@ function BreakdownList({ title, rows }: { title: string; rows: DeptBreakdown[] }
               {row.suppressed ? (
                 <span className="text-xs text-slate-400 italic">Too few responses</span>
               ) : (
-                <span className="font-semibold text-primary">{row.avgRating || "N/A"}</span>
+                <span className={`font-semibold ${ratingColor(row.avgRating)}`}>
+                  {formatRating(row.avgRating, row.ratingScaleMax)}
+                </span>
               )}
             </div>
             <div className="mt-2 h-2 bg-slate-100 rounded-full overflow-hidden">
@@ -558,4 +577,15 @@ function BreakdownList({ title, rows }: { title: string; rows: DeptBreakdown[] }
       </div>
     </div>
   );
+}
+
+function formatRating(value: number | null | undefined, scaleMax: number) {
+  return typeof value === "number" ? `${value.toFixed(1)} / ${scaleMax}` : "N/A";
+}
+
+function ratingColor(value: number | null) {
+  if (value === null) return "text-slate-400";
+  if (value >= 4) return "text-emerald-600";
+  if (value >= 3) return "text-amber-600";
+  return "text-red-600";
 }

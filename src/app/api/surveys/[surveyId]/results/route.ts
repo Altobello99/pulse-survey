@@ -56,6 +56,13 @@ export async function GET(
 
   const filterOptions = await getFilterOptions(session.user);
   const canShowDetailedResults = responses.length >= ANONYMITY_THRESHOLD;
+  const standardRatingQuestionIds = survey.questions
+    .filter((question) => {
+      if (question.type !== "rating") return false;
+      const scale = ratingOptions(question);
+      return Math.min(...scale) === 1 && Math.max(...scale) === 5;
+    })
+    .map((question) => question.id);
 
   if (!canShowDetailedResults) {
     return Response.json({
@@ -66,6 +73,8 @@ export async function GET(
         totalResponses: responses.length,
         totalEmployees,
         completions,
+        averageRating: null,
+        ratingScaleMax: 5,
         sentiment: null,
         departmentBreakdown: [],
         divisionBreakdown: [],
@@ -85,13 +94,14 @@ export async function GET(
     );
 
     if (question.type === "rating") {
+      const scale = ratingOptions(question);
       const ratings = qAnswers
         .map((answer) => answer.ratingValue)
         .filter((value): value is number => value !== null);
       const avg = ratings.length
         ? ratings.reduce((sum, value) => sum + value, 0) / ratings.length
         : 0;
-      const distribution = ratingOptions(question).map((rating) => ({
+      const distribution = scale.map((rating) => ({
         rating,
         count: ratings.filter((value) => value === rating).length,
       }));
@@ -99,6 +109,8 @@ export async function GET(
         ...question,
         resultType: "rating" as const,
         average: Math.round(avg * 10) / 10,
+        scaleMin: Math.min(...scale),
+        scaleMax: Math.max(...scale),
         distribution,
         total: ratings.length,
       };
@@ -133,11 +145,45 @@ export async function GET(
       rawResponsesHidden: !showRawComments,
     };
   });
+  const standardRatingQuestionIdSet = new Set(standardRatingQuestionIds);
+  const standardRatingValues = responses.flatMap((response) =>
+    response.answers
+      .filter((answer) => standardRatingQuestionIdSet.has(answer.questionId))
+      .map((answer) => answer.ratingValue)
+      .filter((value): value is number => value !== null)
+  );
+  const averageRating = standardRatingValues.length
+    ? Math.round(
+        (standardRatingValues.reduce((sum, value) => sum + value, 0) /
+          standardRatingValues.length) *
+          10
+      ) / 10
+    : null;
 
-  const departmentBreakdown = await buildDepartmentBreakdown(surveyId, responseWhere, employeeWhere);
-  const divisionBreakdown = await buildDivisionBreakdown(surveyId, responseWhere, employeeWhere);
-  const teamBreakdown = await buildTeamBreakdown(surveyId, responseWhere, employeeWhere);
-  const locationBreakdown = await buildLocationBreakdown(surveyId, responseWhere, employeeWhere);
+  const departmentBreakdown = await buildDepartmentBreakdown(
+    surveyId,
+    responseWhere,
+    employeeWhere,
+    standardRatingQuestionIds
+  );
+  const divisionBreakdown = await buildDivisionBreakdown(
+    surveyId,
+    responseWhere,
+    employeeWhere,
+    standardRatingQuestionIds
+  );
+  const teamBreakdown = await buildTeamBreakdown(
+    surveyId,
+    responseWhere,
+    employeeWhere,
+    standardRatingQuestionIds
+  );
+  const locationBreakdown = await buildLocationBreakdown(
+    surveyId,
+    responseWhere,
+    employeeWhere,
+    standardRatingQuestionIds
+  );
 
   return Response.json({
     data: {
@@ -151,6 +197,8 @@ export async function GET(
       totalResponses: responses.length,
       totalEmployees,
       completions,
+      averageRating,
+      ratingScaleMax: 5,
       sentiment: survey.sentimentAnalyses[0] || null,
       departmentBreakdown,
       divisionBreakdown,
@@ -227,7 +275,8 @@ async function getFilterOptions(user: Session["user"]) {
 async function buildDivisionBreakdown(
   surveyId: string,
   responseWhere: Prisma.SurveyResponseWhereInput,
-  employeeWhere: Prisma.UserWhereInput
+  employeeWhere: Prisma.UserWhereInput,
+  standardRatingQuestionIds: string[]
 ) {
   const divisions = await prisma.user.findMany({
     where: { AND: [employeeWhere, { division: { not: null } }] },
@@ -248,7 +297,8 @@ async function buildDivisionBreakdown(
           division,
           division,
           scopedResponseWhere,
-          { AND: [employeeWhere, { division }] }
+          { AND: [employeeWhere, { division }] },
+          standardRatingQuestionIds
         );
       })
   );
@@ -257,7 +307,8 @@ async function buildDivisionBreakdown(
 async function buildDepartmentBreakdown(
   surveyId: string,
   responseWhere: Prisma.SurveyResponseWhereInput,
-  employeeWhere: Prisma.UserWhereInput
+  employeeWhere: Prisma.UserWhereInput,
+  standardRatingQuestionIds: string[]
 ) {
   const departments = await prisma.department.findMany({
     where: { users: { some: employeeWhere } },
@@ -274,7 +325,8 @@ async function buildDepartmentBreakdown(
         department.id,
         department.name,
         scopedResponseWhere,
-        { AND: [employeeWhere, { departmentId: department.id }] }
+        { AND: [employeeWhere, { departmentId: department.id }] },
+        standardRatingQuestionIds
       );
     })
   );
@@ -283,7 +335,8 @@ async function buildDepartmentBreakdown(
 async function buildTeamBreakdown(
   surveyId: string,
   responseWhere: Prisma.SurveyResponseWhereInput,
-  employeeWhere: Prisma.UserWhereInput
+  employeeWhere: Prisma.UserWhereInput,
+  standardRatingQuestionIds: string[]
 ) {
   const teams = await prisma.team.findMany({
     where: { users: { some: employeeWhere } },
@@ -300,7 +353,8 @@ async function buildTeamBreakdown(
         team.id,
         team.name,
         scopedResponseWhere,
-        { AND: [employeeWhere, { teamId: team.id }] }
+        { AND: [employeeWhere, { teamId: team.id }] },
+        standardRatingQuestionIds
       );
     })
   );
@@ -309,7 +363,8 @@ async function buildTeamBreakdown(
 async function buildLocationBreakdown(
   surveyId: string,
   responseWhere: Prisma.SurveyResponseWhereInput,
-  employeeWhere: Prisma.UserWhereInput
+  employeeWhere: Prisma.UserWhereInput,
+  standardRatingQuestionIds: string[]
 ) {
   const locations = await prisma.user.findMany({
     where: { AND: [employeeWhere, { location: { not: null } }] },
@@ -330,7 +385,8 @@ async function buildLocationBreakdown(
           location,
           location,
           scopedResponseWhere,
-          { AND: [employeeWhere, { location }] }
+          { AND: [employeeWhere, { location }] },
+          standardRatingQuestionIds
         );
       })
   );
@@ -341,7 +397,8 @@ async function buildBreakdownRow(
   id: string,
   name: string,
   responseWhere: Prisma.SurveyResponseWhereInput,
-  employeeWhere: Prisma.UserWhereInput
+  employeeWhere: Prisma.UserWhereInput,
+  standardRatingQuestionIds: string[]
 ) {
   const [employeeCount, responseCount, completionCount, ratingAnswers] = await Promise.all([
     prisma.user.count({ where: employeeWhere }),
@@ -349,6 +406,7 @@ async function buildBreakdownRow(
     prisma.surveyCompletion.count({ where: { surveyId, user: employeeWhere } }),
     prisma.answer.findMany({
       where: {
+        questionId: { in: standardRatingQuestionIds },
         ratingValue: { not: null },
         surveyResponse: responseWhere,
       },
@@ -364,7 +422,7 @@ async function buildBreakdownRow(
             ratingAnswers.length) *
             10
         ) / 10
-      : 0;
+      : null;
 
   return {
     id,
@@ -374,6 +432,7 @@ async function buildBreakdownRow(
     completions: completionCount,
     participationRate: employeeCount ? Math.round((completionCount / employeeCount) * 100) : 0,
     avgRating,
+    ratingScaleMax: 5,
     suppressed: !showMetrics,
   };
 }
