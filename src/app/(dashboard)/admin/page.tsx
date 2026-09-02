@@ -390,7 +390,7 @@ export default function AdminDashboard() {
           </label>
         </div>
 
-        <div className="grid gap-3 border-t border-slate-200 bg-slate-50 p-4 sm:grid-cols-2 xl:grid-cols-6">
+        <div className="grid gap-3 border-t border-slate-200 bg-slate-50 p-4 sm:grid-cols-2 lg:grid-cols-3">
           <label className="block min-w-0">
             <span className="mb-1 block text-xs font-medium text-slate-600">Break down by</span>
             <select
