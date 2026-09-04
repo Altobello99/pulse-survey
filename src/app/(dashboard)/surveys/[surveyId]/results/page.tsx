@@ -376,7 +376,8 @@ export default function SurveyResultsPage({
           <p className="text-xs text-slate-500 mb-4">
             Aggregated participation and scores per department. Individual responses remain anonymous &mdash; departments with fewer than 3 responses show only participation, not ratings.
           </p>
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto">
+          <table className="w-full min-w-[720px] text-sm">
             <thead className="border-b border-slate-200">
               <tr>
                 <th className="text-left py-2 font-medium text-slate-600">Department</th>
@@ -406,7 +407,7 @@ export default function SurveyResultsPage({
                       </div>
                       <span className="text-slate-600">{dept.participationRate}%</span>
                     </div>
-                    <p className="mt-1 text-xs font-medium text-slate-500">
+                    <p className="mt-1 whitespace-nowrap text-xs font-medium text-slate-500">
                       {dept.completions}/{dept.employeeCount} completed
                     </p>
                   </td>
@@ -423,6 +424,7 @@ export default function SurveyResultsPage({
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 

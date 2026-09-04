@@ -69,8 +69,8 @@ export default function DepartmentsPage() {
         </div>
       )}
 
-      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+        <table className="w-full min-w-[720px] text-sm">
           <thead className="bg-slate-50 border-b border-slate-200">
             <tr>
               <th className="text-left px-6 py-3 font-medium text-slate-600">Department</th>
@@ -101,7 +101,7 @@ export default function DepartmentsPage() {
                     </div>
                     <span className="text-sm text-slate-600">{dept.participationRate}%</span>
                   </div>
-                  <p className="mt-1 text-xs font-medium text-slate-500">
+                  <p className="mt-1 whitespace-nowrap text-xs font-medium text-slate-500">
                     {dept.completions}/{dept.employeeCount} completed
                   </p>
                 </td>
