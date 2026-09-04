@@ -15,6 +15,7 @@ interface DeptData {
   id: string;
   name: string;
   employeeCount: number;
+  completions: number;
   participationRate: number;
   avgRating: number | null;
   ratingScaleMax: number;
@@ -85,7 +86,14 @@ export default function DepartmentsPage() {
                 <td className="px-6 py-4 text-slate-600">{dept.employeeCount}</td>
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-2">
-                    <div className="w-24 h-2 bg-slate-100 rounded-full overflow-hidden">
+                    <div
+                      className="w-24 h-2 bg-slate-100 rounded-full overflow-hidden"
+                      role="progressbar"
+                      aria-label={`${dept.name} participation`}
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                      aria-valuenow={dept.participationRate}
+                    >
                       <div
                         className="h-full bg-primary rounded-full"
                         style={{ width: `${dept.participationRate}%` }}
@@ -93,6 +101,9 @@ export default function DepartmentsPage() {
                     </div>
                     <span className="text-sm text-slate-600">{dept.participationRate}%</span>
                   </div>
+                  <p className="mt-1 text-xs font-medium text-slate-500">
+                    {dept.completions}/{dept.employeeCount} completed
+                  </p>
                 </td>
                 <td className="px-6 py-4">
                   <span className={`font-semibold ${dept.avgRating === null ? "text-slate-400" : dept.avgRating >= 4 ? "text-emerald-600" : dept.avgRating >= 3 ? "text-amber-600" : "text-red-600"}`}>

@@ -394,11 +394,21 @@ export default function SurveyResultsPage({
                   <td className="py-3 text-slate-600">{dept.responses}</td>
                   <td className="py-3">
                     <div className="flex items-center gap-2">
-                      <div className="w-20 h-2 bg-slate-100 rounded-full overflow-hidden">
+                      <div
+                        className="w-20 h-2 bg-slate-100 rounded-full overflow-hidden"
+                        role="progressbar"
+                        aria-label={`${dept.name} participation`}
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-valuenow={dept.participationRate}
+                      >
                         <div className="h-full bg-primary rounded-full" style={{ width: `${dept.participationRate}%` }} />
                       </div>
                       <span className="text-slate-600">{dept.participationRate}%</span>
                     </div>
+                    <p className="mt-1 text-xs font-medium text-slate-500">
+                      {dept.completions}/{dept.employeeCount} completed
+                    </p>
                   </td>
                   <td className="py-3">
                     {!dept.suppressed ? (

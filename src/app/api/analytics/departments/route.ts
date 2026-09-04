@@ -85,6 +85,7 @@ export async function GET() {
         id: dept.id,
         name: dept.name,
         employeeCount,
+        completions: recentCompletions,
         participationRate: employeeCount
           ? Math.round((recentCompletions / employeeCount) * 100)
           : 0,
