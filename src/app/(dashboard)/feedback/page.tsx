@@ -13,10 +13,14 @@ interface FeedbackItem {
   status: string;
   createdAt: string;
   department: { name: string } | null;
+  source: "survey" | "feedback";
+  survey: { id: string; title: string } | null;
+  question: { text: string; section: string | null } | null;
 }
 
 export default function FeedbackPage() {
   const { data: session } = useSession();
+  const isAdmin = session?.user.role === "admin";
   const [feedbackList, setFeedbackList] = useState<FeedbackItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -62,8 +66,14 @@ export default function FeedbackPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Anonymous Feedback</h1>
-          <p className="text-sm text-slate-500">Share your thoughts anonymously</p>
+          <h1 className="text-2xl font-bold text-slate-900">
+            {isAdmin ? "Survey Comments & Feedback" : "Anonymous Feedback"}
+          </h1>
+          <p className="text-sm text-slate-500">
+            {isAdmin
+              ? "Anonymous written survey responses and standalone feedback"
+              : "Share your thoughts anonymously"}
+          </p>
         </div>
         <button
           onClick={() => setShowForm(!showForm)}
@@ -147,7 +157,7 @@ export default function FeedbackPage() {
         </div>
       ) : feedbackList.length === 0 ? (
         <div className="bg-white rounded-xl border border-slate-200 p-12 text-center text-slate-400">
-          No feedback yet. Be the first to share!
+          {isAdmin ? "No written survey comments or feedback yet." : "No feedback yet. Be the first to share!"}
         </div>
       ) : (
         <div className="space-y-3">
@@ -156,10 +166,20 @@ export default function FeedbackPage() {
               <div className="flex items-start gap-3">
                 <div className="flex-1">
                   <p className="text-sm text-slate-700 mb-2">{fb.message}</p>
+                  {fb.source === "survey" && fb.question && (
+                    <p className="mb-2 text-xs text-slate-500">
+                      In response to: {fb.question.text}
+                    </p>
+                  )}
                   <div className="flex items-center gap-3 text-xs text-slate-400">
-                    {fb.category && (
+                    {fb.source === "survey" ? (
+                      <span className="rounded-full bg-teal-50 px-2 py-0.5 font-medium text-teal-700">
+                        Survey comment
+                      </span>
+                    ) : fb.category ? (
                       <span className="px-2 py-0.5 bg-slate-100 rounded-full capitalize">{fb.category}</span>
-                    )}
+                    ) : null}
+                    {fb.survey && <span>{fb.survey.title}</span>}
                     {fb.sentiment && (
                       <span className={`px-2 py-0.5 rounded-full capitalize ${sentimentColor(fb.sentiment)}`}>
                         {fb.sentiment}
@@ -167,13 +187,15 @@ export default function FeedbackPage() {
                     )}
                     {fb.department && <span>{fb.department.name}</span>}
                     <span>{formatDate(fb.createdAt)}</span>
-                    <span className={`px-2 py-0.5 rounded-full ${
-                      fb.status === "addressed" ? "bg-emerald-50 text-emerald-700" :
-                      fb.status === "reviewed" ? "bg-blue-50 text-blue-700" :
-                      "bg-slate-100 text-slate-500"
-                    }`}>
-                      {fb.status}
-                    </span>
+                    {fb.source === "feedback" && (
+                      <span className={`px-2 py-0.5 rounded-full ${
+                        fb.status === "addressed" ? "bg-emerald-50 text-emerald-700" :
+                        fb.status === "reviewed" ? "bg-blue-50 text-blue-700" :
+                        "bg-slate-100 text-slate-500"
+                      }`}>
+                        {fb.status}
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>

@@ -47,12 +47,22 @@ type ParticipationPoint = {
   total: number;
   rate: number;
   hidden: boolean;
+  daily: Array<{
+    date: string;
+    dailyCompletions: number;
+    completions: number;
+    total: number;
+    rate: number;
+  }>;
 };
 
 type FeedbackItem = {
   id: string;
   message: string;
   sentiment: string | null;
+  source: "survey" | "feedback";
+  survey: { id: string; title: string } | null;
+  question: { text: string; section: string | null } | null;
 };
 
 type DashboardStats = {
@@ -187,7 +197,10 @@ export default function AdminDashboard() {
   const [departments, setDepartments] = useState<DepartmentAnalytics[]>([]);
   const [trends, setTrends] = useState<TrendPoint[]>([]);
   const [participation, setParticipation] = useState<ParticipationPoint[]>([]);
-  const [feedback, setFeedback] = useState<FeedbackItem[]>([]);
+  const [feedbackResult, setFeedbackResult] = useState<{
+    surveyId: string;
+    items: FeedbackItem[];
+  } | null>(null);
   const [surveys, setSurveys] = useState<SurveySummary[]>([]);
   const [selectedSurveyId, setSelectedSurveyId] = useState("");
   const [ratingsBreakdown, setRatingsBreakdown] = useState<RatingsBreakdown>("department_location");
@@ -215,18 +228,15 @@ export default function AdminDashboard() {
       fetchData<DepartmentAnalytics[]>("/api/analytics/departments"),
       fetchData<TrendPoint[]>("/api/analytics/trends"),
       fetchData<ParticipationPoint[]>("/api/analytics/participation"),
-      fetchData<FeedbackItem[]>("/api/feedback"),
       fetchData<SurveySummary[]>("/api/surveys"),
-    ]).then(([depts, trnds, part, fb, surveys]) => {
+    ]).then(([depts, trnds, part, surveys]) => {
       const departmentData = depts.data || [];
       const trendData = trnds.data || [];
       const participationData = part.data || [];
-      const feedbackData = fb.data || [];
 
       setDepartments(departmentData);
       setTrends(trendData);
       setParticipation(participationData);
-      setFeedback(feedbackData.slice(0, 5));
 
       const allSurveys: SurveySummary[] = surveys.data || [];
       setSurveys(allSurveys);
@@ -251,6 +261,27 @@ export default function AdminDashboard() {
       setLoading(false);
     }).catch(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    if (!selectedSurveyId) return;
+
+    let cancelled = false;
+    fetchData<FeedbackItem[]>(
+      `/api/feedback?surveyId=${encodeURIComponent(selectedSurveyId)}&limit=5`
+    )
+      .then((payload) => {
+        if (!cancelled) {
+          setFeedbackResult({ surveyId: selectedSurveyId, items: payload.data || [] });
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setFeedbackResult({ surveyId: selectedSurveyId, items: [] });
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedSurveyId]);
 
   useEffect(() => {
     if (!selectedSurveyId) return;
@@ -390,6 +421,13 @@ export default function AdminDashboard() {
   const selectedParticipation = participation.find(
     (point) => point.id === selectedSurveyId
   ) || participation[participation.length - 1] || null;
+  const participationTrend = selectedParticipation?.daily || [];
+  const feedback = feedbackResult?.surveyId === selectedSurveyId
+    ? feedbackResult.items
+    : [];
+  const feedbackLoading = Boolean(
+    selectedSurveyId && feedbackResult?.surveyId !== selectedSurveyId
+  );
   const statCards: Array<{
     label: string;
     value: string | number;
@@ -940,11 +978,16 @@ export default function AdminDashboard() {
 
         {/* Participation Trends */}
         <div className="bg-white rounded-xl border border-slate-200 p-6">
-          <h2 className="text-lg font-semibold text-slate-900 mb-4">Participation Trends</h2>
-          {participation.length > 0 ? (
+          <h2 className="text-lg font-semibold text-slate-900">Participation Trends</h2>
+          <p className="mb-4 mt-1 text-sm text-slate-500">
+            {selectedParticipation
+              ? `${selectedParticipation.title}: cumulative daily completion rate (${selectedParticipation.completions}/${selectedParticipation.total} completed).`
+              : "Cumulative daily completion rate for the selected survey."}
+          </p>
+          {participationTrend.length > 0 ? (
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={participation}>
+                <LineChart data={participationTrend}>
                   <XAxis
                     dataKey="date"
                     tickFormatter={(d) => formatDateShort(d)}
@@ -957,7 +1000,7 @@ export default function AdminDashboard() {
                   <Line
                     type="monotone"
                     dataKey="rate"
-                    name="Participation %"
+                    name="Cumulative participation %"
                     stroke={COLORS.primary}
                     strokeWidth={2}
                     dot={{ fill: COLORS.primary }}
@@ -1002,22 +1045,40 @@ export default function AdminDashboard() {
       {/* Recent Feedback */}
       <div className="bg-white rounded-xl border border-slate-200 p-6">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-slate-900">Recent Feedback</h2>
+          <div>
+            <h2 className="text-lg font-semibold text-slate-900">Recent Survey Comments</h2>
+            <p className="mt-1 text-sm text-slate-500">Anonymous written responses from the selected survey.</p>
+          </div>
           <Link href="/feedback" className="text-sm text-primary hover:underline">View all</Link>
         </div>
-        {feedback.length > 0 ? (
+        {feedbackLoading ? (
+          <div className="space-y-3" aria-live="polite">
+            {[1, 2, 3].map((item) => (
+              <div key={item} className="h-16 animate-pulse rounded-lg bg-slate-100" />
+            ))}
+          </div>
+        ) : feedback.length > 0 ? (
           <div className="space-y-3">
             {feedback.map((fb) => (
               <div key={fb.id} className="p-3 bg-slate-50 rounded-lg flex items-start gap-3">
-                <span className={`shrink-0 mt-0.5 px-2 py-0.5 rounded-full text-xs font-medium ${sentimentColor(fb.sentiment || "neutral")}`}>
-                  {fb.sentiment || "pending"}
+                <span className={`shrink-0 mt-0.5 px-2 py-0.5 rounded-full text-xs font-medium ${
+                  fb.source === "survey"
+                    ? "bg-teal-50 text-teal-700"
+                    : sentimentColor(fb.sentiment || "neutral")
+                }`}>
+                  {fb.source === "survey" ? "survey comment" : fb.sentiment || "feedback"}
                 </span>
-                <p className="text-sm text-slate-700 line-clamp-2">{fb.message}</p>
+                <div className="min-w-0">
+                  <p className="text-sm text-slate-700 line-clamp-2">{fb.message}</p>
+                  {fb.question && (
+                    <p className="mt-1 truncate text-xs text-slate-400">Question: {fb.question.text}</p>
+                  )}
+                </div>
               </div>
             ))}
           </div>
         ) : (
-          <p className="text-sm text-slate-400">No feedback yet.</p>
+          <p className="text-sm text-slate-400">No written survey comments yet.</p>
         )}
       </div>
     </div>
