@@ -1,4 +1,4 @@
-import anthropic from "./anthropic";
+import { getAnthropicClient } from "./anthropic";
 
 interface SentimentResult {
   sentiment: "positive" | "neutral" | "negative" | "mixed";
@@ -11,14 +11,16 @@ interface SentimentResult {
 export async function analyzeSentiment(
   surveyTitle: string,
   questionText: string,
-  responses: string[]
+  responses: string[],
+  gatewayToken?: string
 ): Promise<SentimentResult> {
   const numberedResponses = responses
     .map((r, i) => `${i + 1}. "${r}"`)
     .join("\n");
 
-  const message = await anthropic.messages.create({
-    model: "claude-sonnet-4-20250514",
+  const anthropic = getAnthropicClient(gatewayToken);
+  const message = await anthropic.client.messages.create({
+    model: anthropic.model,
     max_tokens: 1024,
     temperature: 0,
     system:

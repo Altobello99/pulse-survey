@@ -13,7 +13,12 @@ import {
   Line,
 } from "recharts";
 import { COLORS } from "@/lib/constants";
-import { formatDateShort, sentimentColor } from "@/lib/utils";
+import { formatDateShort } from "@/lib/utils";
+import {
+  COMMENT_SEVERITY_RANK,
+  type CommentSeverity,
+  type SerializedCommentAnalysis,
+} from "@/lib/comment-analysis-types";
 
 type SurveySummary = {
   id: string;
@@ -59,10 +64,11 @@ type ParticipationPoint = {
 type FeedbackItem = {
   id: string;
   message: string;
-  sentiment: string | null;
+  createdAt: string;
   source: "survey" | "feedback";
   survey: { id: string; title: string } | null;
   question: { text: string; section: string | null } | null;
+  analysis: SerializedCommentAnalysis | null;
 };
 
 type DashboardStats = {
@@ -185,6 +191,32 @@ function enpsRangeLabel(score: number) {
   return ENPS_RANGES[3].label;
 }
 
+function feedbackSeverityLabel(severity: CommentSeverity) {
+  return severity === "needs_review"
+    ? "Needs Review"
+    : severity.charAt(0).toUpperCase() + severity.slice(1);
+}
+
+function feedbackSeverityTone(severity: CommentSeverity | undefined) {
+  switch (severity) {
+    case "critical": return "bg-red-100 text-red-800";
+    case "high": return "bg-orange-100 text-orange-800";
+    case "medium": return "bg-amber-100 text-amber-800";
+    case "low": return "bg-slate-200 text-slate-700";
+    case "needs_review": return "bg-violet-100 text-violet-800";
+    default: return "bg-blue-50 text-blue-700";
+  }
+}
+
+function feedbackSentimentTone(sentiment: SerializedCommentAnalysis["sentiment"] | undefined) {
+  switch (sentiment) {
+    case "positive": return "bg-emerald-50 text-emerald-700";
+    case "negative": return "bg-rose-50 text-rose-700";
+    case "mixed": return "bg-amber-50 text-amber-700";
+    default: return "bg-slate-100 text-slate-600";
+  }
+}
+
 async function fetchData<T>(url: string): Promise<ApiResponse<T>> {
   const response = await fetch(url);
   const payload = await response.json() as ApiResponse<T>;
@@ -197,10 +229,8 @@ export default function AdminDashboard() {
   const [departments, setDepartments] = useState<DepartmentAnalytics[]>([]);
   const [trends, setTrends] = useState<TrendPoint[]>([]);
   const [participation, setParticipation] = useState<ParticipationPoint[]>([]);
-  const [feedbackResult, setFeedbackResult] = useState<{
-    surveyId: string;
-    items: FeedbackItem[];
-  } | null>(null);
+  const [allFeedback, setAllFeedback] = useState<FeedbackItem[]>([]);
+  const [feedbackLoading, setFeedbackLoading] = useState(true);
   const [surveys, setSurveys] = useState<SurveySummary[]>([]);
   const [selectedSurveyId, setSelectedSurveyId] = useState("");
   const [ratingsBreakdown, setRatingsBreakdown] = useState<RatingsBreakdown>("department_location");
@@ -222,6 +252,24 @@ export default function AdminDashboard() {
     departmentFilter,
     locationFilter,
   ].join("|");
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchData<FeedbackItem[]>("/api/feedback?limit=5000")
+      .then((payload) => {
+        if (!cancelled) setAllFeedback(payload.data || []);
+      })
+      .catch(() => {
+        if (!cancelled) setAllFeedback([]);
+      })
+      .finally(() => {
+        if (!cancelled) setFeedbackLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     Promise.all([
@@ -261,27 +309,6 @@ export default function AdminDashboard() {
       setLoading(false);
     }).catch(() => setLoading(false));
   }, []);
-
-  useEffect(() => {
-    if (!selectedSurveyId) return;
-
-    let cancelled = false;
-    fetchData<FeedbackItem[]>(
-      `/api/feedback?surveyId=${encodeURIComponent(selectedSurveyId)}&limit=5`
-    )
-      .then((payload) => {
-        if (!cancelled) {
-          setFeedbackResult({ surveyId: selectedSurveyId, items: payload.data || [] });
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setFeedbackResult({ surveyId: selectedSurveyId, items: [] });
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedSurveyId]);
 
   useEffect(() => {
     if (!selectedSurveyId) return;
@@ -422,12 +449,16 @@ export default function AdminDashboard() {
     (point) => point.id === selectedSurveyId
   ) || participation[participation.length - 1] || null;
   const participationTrend = selectedParticipation?.daily || [];
-  const feedback = feedbackResult?.surveyId === selectedSurveyId
-    ? feedbackResult.items
-    : [];
-  const feedbackLoading = Boolean(
-    selectedSurveyId && feedbackResult?.surveyId !== selectedSurveyId
-  );
+  const criticalFeedbackCount = allFeedback.filter(
+    (item) => item.analysis?.severity === "critical"
+  ).length;
+  const feedback = [...allFeedback]
+    .sort((a, b) => {
+      const severityDifference = COMMENT_SEVERITY_RANK[a.analysis?.severity || "pending"]
+        - COMMENT_SEVERITY_RANK[b.analysis?.severity || "pending"];
+      return severityDifference || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    })
+    .slice(0, 5);
   const statCards: Array<{
     label: string;
     value: string | number;
@@ -1046,11 +1077,27 @@ export default function AdminDashboard() {
       <div className="bg-white rounded-xl border border-slate-200 p-6">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h2 className="text-lg font-semibold text-slate-900">Recent Survey Comments</h2>
-            <p className="mt-1 text-sm text-slate-500">Anonymous written responses from the selected survey.</p>
+            <h2 className="text-lg font-semibold text-slate-900">Priority Comments</h2>
+            <p className="mt-1 text-sm text-slate-500">AI-prioritized anonymous survey comments and feedback.</p>
           </div>
           <Link href="/feedback" className="text-sm text-primary hover:underline">View all</Link>
         </div>
+        {criticalFeedbackCount > 0 && (
+          <Link
+            href="/feedback"
+            className="mb-4 flex items-start justify-between gap-3 rounded-lg border border-red-300 bg-red-50 p-3 text-red-900 hover:bg-red-100"
+          >
+            <span>
+              <strong>
+                {criticalFeedbackCount} Critical {criticalFeedbackCount === 1 ? "comment" : "comments"}
+              </strong>
+              <span className="mt-0.5 block text-xs text-red-800">
+                Prompt human review is recommended. AI severity is a triage signal only.
+              </span>
+            </span>
+            <span className="shrink-0 text-sm font-semibold">Review</span>
+          </Link>
+        )}
         {feedbackLoading ? (
           <div className="space-y-3" aria-live="polite">
             {[1, 2, 3].map((item) => (
@@ -1061,14 +1108,17 @@ export default function AdminDashboard() {
           <div className="space-y-3">
             {feedback.map((fb) => (
               <div key={fb.id} className="p-3 bg-slate-50 rounded-lg flex items-start gap-3">
-                <span className={`shrink-0 mt-0.5 px-2 py-0.5 rounded-full text-xs font-medium ${
-                  fb.source === "survey"
-                    ? "bg-teal-50 text-teal-700"
-                    : sentimentColor(fb.sentiment || "neutral")
-                }`}>
-                  {fb.source === "survey" ? "survey comment" : fb.sentiment || "feedback"}
-                </span>
                 <div className="min-w-0">
+                  <div className="mb-1 flex flex-wrap gap-1.5">
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${feedbackSeverityTone(fb.analysis?.severity)}`}>
+                      {fb.analysis ? feedbackSeverityLabel(fb.analysis.severity) : "Pending AI"}
+                    </span>
+                    {fb.analysis && (
+                      <span className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ${feedbackSentimentTone(fb.analysis.sentiment)}`}>
+                        {fb.analysis.sentiment}
+                      </span>
+                    )}
+                  </div>
                   <p className="text-sm text-slate-700 line-clamp-2">{fb.message}</p>
                   {fb.question && (
                     <p className="mt-1 truncate text-xs text-slate-400">Question: {fb.question.text}</p>
@@ -1078,7 +1128,7 @@ export default function AdminDashboard() {
             ))}
           </div>
         ) : (
-          <p className="text-sm text-slate-400">No written survey comments yet.</p>
+          <p className="text-sm text-slate-400">No written comments or feedback yet.</p>
         )}
       </div>
     </div>

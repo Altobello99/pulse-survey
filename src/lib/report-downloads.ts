@@ -31,8 +31,8 @@ export const REPORT_DOWNLOADS = [
   },
   {
     type: "comments-themes",
-    label: "Anonymous Comments and Themes",
-    description: "Admin-only raw comments plus grouped AI themes when analysis is available.",
+    label: "AI Comment Triage & Anonymous Comments",
+    description: "Admin-only comments with severity, sentiment, themes, confidence, and grouped AI triage totals.",
   },
   {
     type: "completion-tracker",

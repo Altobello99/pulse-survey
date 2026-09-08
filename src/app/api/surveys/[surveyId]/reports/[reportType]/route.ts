@@ -41,6 +41,17 @@ type EmployeeForReport = Prisma.UserGetPayload<{
   };
 }>;
 type CompletionForReport = { userId: string; completedAt: Date };
+type CommentAnalysisForReport = {
+  sourceId: string;
+  sentiment: string;
+  severity: string;
+  suggestedSeverity: string;
+  themes: string;
+  confidence: number;
+  reason: string;
+  model: string;
+  analyzedAt: Date;
+};
 type ReportFilters = {
   departmentId?: string | null;
   division?: string | null;
@@ -61,6 +72,7 @@ type ReportContext = {
   responses: ResponseForReport[];
   employees: EmployeeForReport[];
   completions: CompletionForReport[];
+  commentAnalyses: CommentAnalysisForReport[];
 };
 
 const reportLabels: Record<ReportType, string> = {
@@ -176,6 +188,30 @@ async function buildReportContext(
       orderBy: { completedAt: "asc" },
     }),
   ]);
+  const commentAnswerIds = responses.flatMap((response) =>
+    response.answers
+      .filter((answer) => Boolean(answer.textValue?.trim()))
+      .map((answer) => answer.id)
+  );
+  const commentAnalyses = commentAnswerIds.length
+    ? await prisma.commentAnalysis.findMany({
+        where: {
+          sourceType: "survey",
+          sourceId: { in: commentAnswerIds },
+        },
+        select: {
+          sourceId: true,
+          sentiment: true,
+          severity: true,
+          suggestedSeverity: true,
+          themes: true,
+          confidence: true,
+          reason: true,
+          model: true,
+          analyzedAt: true,
+        },
+      })
+    : [];
 
   return {
     reportType,
@@ -188,6 +224,7 @@ async function buildReportContext(
     responses,
     employees,
     completions,
+    commentAnalyses,
   };
 }
 
@@ -413,25 +450,82 @@ function buildCommentsThemesReport(context: ReportContext): ReportSheet[] {
   const themeRows: CellValue[][] = [
     ...summaryRows(context),
     [],
-    ["Theme", "Source", "Notes"],
+    ["Theme", "Comments", "Critical", "High", "Negative"],
   ];
-  const analysis = context.survey.sentimentAnalyses[0];
-  if (analysis) {
-    for (const theme of safeJsonArray(analysis.themes)) {
-      themeRows.push([theme, "AI analysis", analysis.summary]);
+  const themeSummary = new Map<string, {
+    comments: number;
+    critical: number;
+    high: number;
+    negative: number;
+  }>();
+  for (const commentAnalysis of context.commentAnalyses) {
+    for (const theme of safeJsonArray(commentAnalysis.themes)) {
+      const summary = themeSummary.get(theme) || {
+        comments: 0,
+        critical: 0,
+        high: 0,
+        negative: 0,
+      };
+      summary.comments += 1;
+      if (commentAnalysis.severity === "critical") summary.critical += 1;
+      if (commentAnalysis.severity === "high") summary.high += 1;
+      if (commentAnalysis.sentiment === "negative") summary.negative += 1;
+      themeSummary.set(theme, summary);
     }
-  } else {
-    themeRows.push(["Not analyzed", "AI analysis", "Run AI analysis from the results page to generate grouped themes."]);
+  }
+  for (const [theme, summary] of [...themeSummary.entries()].sort(
+    (a, b) => b[1].comments - a[1].comments || a[0].localeCompare(b[0])
+  )) {
+    themeRows.push([
+      theme,
+      summary.comments,
+      summary.critical,
+      summary.high,
+      summary.negative,
+    ]);
+  }
+  if (themeSummary.size === 0) {
+    themeRows.push(["Pending AI analysis", 0, 0, 0, 0]);
   }
 
   const commentRows: CellValue[][] = [
     ...summaryRows(context),
     [],
-    ["Section", "Question", "Anonymous Comment"],
+    [
+      "Section",
+      "Question",
+      "Anonymous Comment",
+      "Sentiment",
+      "Severity",
+      "Suggested Severity",
+      "Themes",
+      "AI Confidence",
+      "AI Triage Rationale",
+      "Analysis Engine",
+      "Analyzed At",
+    ],
   ];
+  const analysisByAnswerId = new Map(
+    context.commentAnalyses.map((analysis) => [analysis.sourceId, analysis])
+  );
   for (const question of context.survey.questions.filter((question) => question.type === "free_text")) {
-    for (const comment of textAnswers(answersForQuestion(context, question.id))) {
-      commentRows.push([question.section || "", question.text, comment]);
+    for (const answer of answersForQuestion(context, question.id)) {
+      const comment = answer.textValue?.trim();
+      if (!comment) continue;
+      const analysis = analysisByAnswerId.get(answer.id);
+      commentRows.push([
+        question.section || "",
+        question.text,
+        comment,
+        analysis?.sentiment || "Pending analysis",
+        analysis?.severity || "Pending analysis",
+        analysis?.suggestedSeverity || "Pending analysis",
+        analysis ? safeJsonArray(analysis.themes).join(", ") : "",
+        analysis ? `${Math.round(analysis.confidence * 100)}%` : "",
+        analysis?.reason || "",
+        analysis?.model || "",
+        analysis?.analyzedAt || null,
+      ]);
     }
   }
   if (commentRows.length === summaryRows(context).length + 2) {

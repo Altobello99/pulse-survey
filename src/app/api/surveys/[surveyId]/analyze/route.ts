@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { analyzeSentiment } from "@/lib/sentiment";
 
 export async function POST(
-  _req: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ surveyId: string }> }
 ) {
   const session = await getServerSession(authOptions);
@@ -48,7 +48,12 @@ export async function POST(
 
     if (texts.length === 0) continue;
 
-    const result = await analyzeSentiment(survey.title, question.text, texts);
+    const result = await analyzeSentiment(
+      survey.title,
+      question.text,
+      texts,
+      request.headers.get("x-vercel-oidc-token") || undefined
+    );
 
     const analysis = await prisma.sentimentAnalysis.create({
       data: {

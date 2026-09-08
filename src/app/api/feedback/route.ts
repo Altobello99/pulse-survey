@@ -1,9 +1,15 @@
-import { NextRequest } from "next/server";
+import { after, NextRequest } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { ANONYMITY_THRESHOLD } from "@/lib/constants";
+import {
+  analyzeStandaloneFeedback,
+} from "@/lib/comment-analysis";
+import { parseCommentThemes } from "@/lib/comment-analysis-types";
 import type { Prisma } from "@/generated/prisma/client";
+
+export const maxDuration = 60;
 
 export async function GET(request: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -14,8 +20,9 @@ export async function GET(request: NextRequest) {
 
   const surveyId = request.nextUrl.searchParams.get("surveyId");
   const requestedLimit = Number(request.nextUrl.searchParams.get("limit") || 500);
+  const maximumLimit = session.user.role === "admin" ? 5_000 : 500;
   const limit = Number.isFinite(requestedLimit)
-    ? Math.min(500, Math.max(1, Math.trunc(requestedLimit)))
+    ? Math.min(maximumLimit, Math.max(1, Math.trunc(requestedLimit)))
     : 500;
   const where: Prisma.FeedbackWhereInput = {};
   if (session.user.role === "manager") {
@@ -41,13 +48,52 @@ export async function GET(request: NextRequest) {
       source: "feedback" as const,
       survey: null,
       question: null,
+      analysisSourceType: "feedback",
+      analysisSourceId: item.id,
     })),
     ...surveyComments,
   ]
     .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
     .slice(0, limit);
+  const analysisFilters: Prisma.CommentAnalysisWhereInput[] = ["survey", "feedback"]
+    .map((sourceType) => ({
+      sourceType,
+      sourceId: {
+        in: data
+          .filter((item) => item.analysisSourceType === sourceType)
+          .map((item) => item.analysisSourceId),
+      },
+    }))
+    .filter((filter) => filter.sourceId?.in?.length);
+  const analyses = session.user.role === "admin" && analysisFilters.length
+    ? await prisma.commentAnalysis.findMany({
+        where: { OR: analysisFilters },
+      })
+    : [];
+  const analysisBySource = new Map(
+    analyses.map((analysis) => [
+      `${analysis.sourceType}:${analysis.sourceId}`,
+      {
+        sentiment: analysis.sentiment,
+        severity: analysis.severity,
+        suggestedSeverity: analysis.suggestedSeverity,
+        themes: parseCommentThemes(analysis.themes),
+        confidence: analysis.confidence,
+        reason: analysis.reason,
+        model: analysis.model,
+        analyzedAt: analysis.analyzedAt,
+      },
+    ])
+  );
+  const responseData = data.map((item) => {
+    const { analysisSourceType, analysisSourceId, ...comment } = item;
+    return {
+      ...comment,
+      analysis: analysisBySource.get(`${analysisSourceType}:${analysisSourceId}`) || null,
+    };
+  });
 
-  return Response.json({ data });
+  return Response.json({ data: responseData });
 }
 
 async function getSurveyComments(surveyId: string | null, limit: number) {
@@ -109,6 +155,8 @@ async function getSurveyComments(surveyId: string | null, limit: number) {
         text: answer.question.text,
         section: answer.question.section,
       },
+      analysisSourceType: "survey",
+      analysisSourceId: answer.id,
     }));
 }
 
@@ -133,6 +181,21 @@ export async function POST(request: NextRequest) {
       departmentId: includeDepartment ? session.user.departmentId : null,
       teamId: includeDepartment ? session.user.teamId : null,
     },
+  });
+  const gatewayToken = request.headers.get("x-vercel-oidc-token") || undefined;
+
+  after(async () => {
+    try {
+      const firstAttempt = await analyzeStandaloneFeedback(feedback.id, { gatewayToken });
+      if (firstAttempt.failed > 0) {
+        await analyzeStandaloneFeedback(feedback.id, { gatewayToken });
+      }
+    } catch (error) {
+      console.error(
+        "Standalone feedback analysis failed",
+        error instanceof Error ? error.message.slice(0, 500) : "Unknown error"
+      );
+    }
   });
 
   return Response.json({ data: feedback }, { status: 201 });

@@ -1,4 +1,4 @@
-import { NextRequest } from "next/server";
+import { after, NextRequest } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -7,6 +7,9 @@ import {
   getAnonymousFallbackDepartmentId,
   getEligibleSurveyDemographics,
 } from "@/lib/demographic-options";
+import { analyzeSurveyResponseComments } from "@/lib/comment-analysis";
+
+export const maxDuration = 60;
 
 type SubmittedAnswer = {
   questionId: string;
@@ -182,7 +185,7 @@ export async function POST(
   fuzzedTime.setMinutes(0, 0, 0);
 
   // Create anonymous response (no userId!)
-  await prisma.$transaction([
+  const [createdResponse] = await prisma.$transaction([
     prisma.surveyResponse.create({
       data: {
         surveyId,
@@ -207,6 +210,21 @@ export async function POST(
       data: { userId: session.user.id, surveyId },
     }),
   ]);
+
+  const gatewayToken = request.headers.get("x-vercel-oidc-token") || undefined;
+  after(async () => {
+    try {
+      const firstAttempt = await analyzeSurveyResponseComments(createdResponse.id, { gatewayToken });
+      if (firstAttempt.failed > 0) {
+        await analyzeSurveyResponseComments(createdResponse.id, { gatewayToken });
+      }
+    } catch (error) {
+      console.error(
+        "Survey comment analysis failed",
+        error instanceof Error ? error.message.slice(0, 500) : "Unknown error"
+      );
+    }
+  });
 
   return Response.json({ data: { success: true } }, { status: 201 });
 }

@@ -70,19 +70,19 @@ model SurveyCompletion {
 }
 
 model Survey {
-  id                String             @id @default(cuid())
+  id                String              @id @default(cuid())
   title             String
   description       String?
-  status            String             @default("draft")
+  status            String              @default("draft")
   frequency         String?
   startDate         DateTime
   endDate           DateTime
-  publicToken       String?            @unique
-  allowAnonymous    Boolean            @default(false)
+  publicToken       String?             @unique
+  allowAnonymous    Boolean             @default(false)
   createdById       String
-  createdBy         User               @relation(fields: [createdById], references: [id])
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
+  createdBy         User                @relation(fields: [createdById], references: [id])
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
   questions         Question[]
   responses         SurveyResponse[]
   completions       SurveyCompletion[]
@@ -103,15 +103,15 @@ model AnonymousToken {
 }
 
 model EmailLog {
-  id         String   @id @default(cuid())
-  recipient  String
-  subject    String
-  body       String
-  category   String
-  status     String   @default("pending")
-  sentAt     DateTime?
-  errorMsg   String?
-  createdAt  DateTime @default(now())
+  id        String    @id @default(cuid())
+  recipient String
+  subject   String
+  body      String
+  category  String
+  status    String    @default("pending")
+  sentAt    DateTime?
+  errorMsg  String?
+  createdAt DateTime  @default(now())
 }
 
 model Question {
@@ -179,6 +179,25 @@ model Feedback {
   sentiment    String?
   status       String      @default("new")
   createdAt    DateTime    @default(now())
+}
+
+model CommentAnalysis {
+  id                String   @id @default(cuid())
+  sourceType        String
+  sourceId          String
+  sentiment         String
+  severity          String
+  suggestedSeverity String
+  themes            String
+  confidence        Float
+  reason            String
+  model             String
+  analyzedAt        DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([sourceType, sourceId])
+  @@index([severity])
+  @@index([sentiment])
 }
 
 model ActionItem {
