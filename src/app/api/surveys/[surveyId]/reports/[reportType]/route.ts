@@ -494,6 +494,7 @@ function buildCommentsThemesReport(context: ReportContext): ReportSheet[] {
     [
       "Section",
       "Question",
+      "Department",
       "Anonymous Comment",
       "Sentiment",
       "Severity",
@@ -508,28 +509,41 @@ function buildCommentsThemesReport(context: ReportContext): ReportSheet[] {
   const analysisByAnswerId = new Map(
     context.commentAnalyses.map((analysis) => [analysis.sourceId, analysis])
   );
+  const responseCountByDepartment = new Map<string, number>();
+  for (const response of context.responses) {
+    responseCountByDepartment.set(
+      response.departmentId,
+      (responseCountByDepartment.get(response.departmentId) || 0) + 1
+    );
+  }
   for (const question of context.survey.questions.filter((question) => question.type === "free_text")) {
-    for (const answer of answersForQuestion(context, question.id)) {
-      const comment = answer.textValue?.trim();
-      if (!comment) continue;
-      const analysis = analysisByAnswerId.get(answer.id);
-      commentRows.push([
-        question.section || "",
-        question.text,
-        comment,
-        analysis?.sentiment || "Pending analysis",
-        analysis?.severity || "Pending analysis",
-        analysis?.suggestedSeverity || "Pending analysis",
-        analysis ? safeJsonArray(analysis.themes).join(", ") : "",
-        analysis ? `${Math.round(analysis.confidence * 100)}%` : "",
-        analysis?.reason || "",
-        analysis?.model || "",
-        analysis?.analyzedAt || null,
-      ]);
+    for (const response of context.responses) {
+      for (const answer of response.answers.filter((answer) => answer.questionId === question.id)) {
+        const comment = answer.textValue?.trim();
+        if (!comment) continue;
+        const analysis = analysisByAnswerId.get(answer.id);
+        const department = (responseCountByDepartment.get(response.departmentId) || 0) >= ANONYMITY_THRESHOLD
+          ? response.department.name
+          : "Protected";
+        commentRows.push([
+          question.section || "",
+          question.text,
+          department,
+          comment,
+          analysis?.sentiment || "Pending analysis",
+          analysis?.severity || "Pending analysis",
+          analysis?.suggestedSeverity || "Pending analysis",
+          analysis ? safeJsonArray(analysis.themes).join(", ") : "",
+          analysis ? `${Math.round(analysis.confidence * 100)}%` : "",
+          analysis?.reason || "",
+          analysis?.model || "",
+          analysis?.analyzedAt || null,
+        ]);
+      }
     }
   }
   if (commentRows.length === summaryRows(context).length + 2) {
-    commentRows.push(["", "", "No written comments yet."]);
+    commentRows.push(["", "", "", "No written comments yet."]);
   }
 
   return [

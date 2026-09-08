@@ -76,6 +76,7 @@ export async function GET(request: NextRequest) {
     prisma.user.findMany({
       where: departmentedBambooEmployeeWhere,
       select: {
+        id: true,
         departmentId: true,
         location: true,
         department: { select: { name: true } },
@@ -125,6 +126,7 @@ export async function GET(request: NextRequest) {
   });
 
   const groupDefinitions = new Map<string, GroupDefinition>();
+  const employeeIdsByGroup = new Map<string, string[]>();
   for (const employee of filteredEmployees) {
     const definition = makeGroupDefinition(
       breakdown,
@@ -134,31 +136,45 @@ export async function GET(request: NextRequest) {
       overallLabel
     );
     groupDefinitions.set(definition.id, definition);
+    const employeeIds = employeeIdsByGroup.get(definition.id) || [];
+    employeeIds.push(employee.id);
+    employeeIdsByGroup.set(definition.id, employeeIds);
   }
 
   const filteredDepartmentIds = [...new Set(filteredEmployees.map((employee) => employee.departmentId))];
-  const responses = await prisma.surveyResponse.findMany({
-    where: {
-      surveyId,
-      departmentId: { in: filteredDepartmentIds },
-      ...(locationFilter ? { location: locationFilter } : {}),
-    },
-    select: {
-      departmentId: true,
-      location: true,
-      department: { select: { name: true } },
-      answers: {
-        where: {
-          questionId: { in: analyticsQuestionIds },
-          OR: [
-            { ratingValue: { not: null } },
-            { choiceValue: { not: null } },
-          ],
-        },
-        select: { questionId: true, ratingValue: true, choiceValue: true },
+  const filteredEmployeeIds = filteredEmployees.map((employee) => employee.id);
+  const [responses, completions] = await Promise.all([
+    prisma.surveyResponse.findMany({
+      where: {
+        surveyId,
+        departmentId: { in: filteredDepartmentIds },
+        ...(locationFilter ? { location: locationFilter } : {}),
       },
-    },
-  });
+      select: {
+        departmentId: true,
+        location: true,
+        department: { select: { name: true } },
+        answers: {
+          where: {
+            questionId: { in: analyticsQuestionIds },
+            OR: [
+              { ratingValue: { not: null } },
+              { choiceValue: { not: null } },
+            ],
+          },
+          select: { questionId: true, ratingValue: true, choiceValue: true },
+        },
+      },
+    }),
+    prisma.surveyCompletion.findMany({
+      where: {
+        surveyId,
+        userId: { in: filteredEmployeeIds },
+      },
+      select: { userId: true },
+    }),
+  ]);
+  const completedUserIds = new Set(completions.map((completion) => completion.userId));
 
   const responsesByGroup = new Map<string, typeof responses>();
   for (const response of responses) {
@@ -192,6 +208,9 @@ export async function GET(request: NextRequest) {
     .sort((a, b) => a.label.localeCompare(b.label))
     .map((group) => {
       const groupResponses = responsesByGroup.get(group.id) || [];
+      const groupEmployeeIds = employeeIdsByGroup.get(group.id) || [];
+      const employeeCount = groupEmployeeIds.length;
+      const completionCount = groupEmployeeIds.filter((userId) => completedUserIds.has(userId)).length;
       const responseCount = groupResponses.length;
       const status = responseCount === 0
         ? "no_responses"
@@ -201,6 +220,9 @@ export async function GET(request: NextRequest) {
 
       return {
         ...group,
+        employeeCount,
+        completionCount,
+        participationRate: percentage(completionCount, employeeCount),
         responseCount: status === "available" ? responseCount : null,
         status,
         ratings: questions.map((question) => {

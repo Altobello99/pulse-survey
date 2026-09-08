@@ -68,6 +68,8 @@ type FeedbackItem = {
   source: "survey" | "feedback";
   survey: { id: string; title: string } | null;
   question: { text: string; section: string | null } | null;
+  department: { name: string } | null;
+  departmentProtected: boolean;
   analysis: SerializedCommentAnalysis | null;
 };
 
@@ -109,6 +111,9 @@ type QuestionRatingsData = {
     departmentId: string | null;
     departmentName: string | null;
     location: string | null;
+    employeeCount: number;
+    completionCount: number;
+    participationRate: number;
     responseCount: number | null;
     status: "no_responses" | "suppressed" | "available";
     ratings: Array<{ questionId: string; average: number | null }>;
@@ -934,11 +939,10 @@ export default function AdminDashboard() {
                         <span className="block">{group.label}</span>
                       )}
                       <span className="mt-1 block text-xs font-normal text-slate-500">
-                        {group.status === "available"
-                          ? `${group.responseCount} responses`
-                          : group.status === "suppressed"
-                            ? "Protected"
-                            : "No responses"}
+                        {group.completionCount} out of {group.employeeCount} completed
+                      </span>
+                      <span className="mt-0.5 block text-xs font-normal text-slate-500">
+                        {group.participationRate}% complete
                       </span>
                     </th>
                   ))}
@@ -1123,6 +1127,13 @@ export default function AdminDashboard() {
                   {fb.question && (
                     <p className="mt-1 truncate text-xs text-slate-400">Question: {fb.question.text}</p>
                   )}
+                  <p className="mt-1 text-xs text-slate-400">
+                    {fb.department
+                      ? `Department: ${fb.department.name}`
+                      : fb.departmentProtected
+                        ? "Department protected"
+                        : "Department not provided"}
+                  </p>
                 </div>
               </div>
             ))}

@@ -18,6 +18,7 @@ interface FeedbackItem {
   status: string;
   createdAt: string;
   department: { name: string } | null;
+  departmentProtected: boolean;
   source: "survey" | "feedback";
   survey: { id: string; title: string } | null;
   question: { text: string; section: string | null } | null;
@@ -44,6 +45,7 @@ export default function FeedbackPage() {
   const [severityFilter, setSeverityFilter] = useState("");
   const [sentimentFilter, setSentimentFilter] = useState("");
   const [themeFilter, setThemeFilter] = useState("");
+  const [departmentFilter, setDepartmentFilter] = useState("");
   const [surveyFilter, setSurveyFilter] = useState("");
   const [questionFilter, setQuestionFilter] = useState("");
   const [dateFilter, setDateFilter] = useState("all");
@@ -107,6 +109,7 @@ export default function FeedbackPage() {
       .map((item) => item.question?.text)
       .filter((value): value is string => Boolean(value))),
     themes: unique(feedbackList.flatMap((item) => item.analysis?.themes || [])),
+    departments: unique(feedbackList.map(departmentFilterValue)),
   }), [feedbackList]);
 
   const filteredComments = useMemo(() => {
@@ -120,6 +123,7 @@ export default function FeedbackPage() {
       if (severityFilter && severity !== severityFilter) return false;
       if (sentimentFilter && item.analysis?.sentiment !== sentimentFilter) return false;
       if (themeFilter && !item.analysis?.themes.includes(themeFilter)) return false;
+      if (departmentFilter && departmentFilterValue(item) !== departmentFilter) return false;
       if (surveyFilter && item.survey?.title !== surveyFilter) return false;
       if (questionFilter && item.question?.text !== questionFilter) return false;
       if (cutoff && new Date(item.createdAt).getTime() < cutoff) return false;
@@ -130,12 +134,14 @@ export default function FeedbackPage() {
         item.survey?.title,
         item.question?.text,
         item.question?.section,
+        departmentLabel(item),
         item.analysis?.reason,
         ...(item.analysis?.themes || []),
       ].some((value) => value?.toLowerCase().includes(normalizedSearch));
     });
   }, [
     dateFilter,
+    departmentFilter,
     feedbackList,
     questionFilter,
     search,
@@ -180,7 +186,7 @@ export default function FeedbackPage() {
 
   const hasFilters = Boolean(
     search || severityFilter || sentimentFilter || themeFilter || surveyFilter ||
-    questionFilter || dateFilter !== "all"
+    departmentFilter || questionFilter || dateFilter !== "all"
   );
 
   return (
@@ -359,6 +365,12 @@ export default function FeedbackPage() {
                 <option value="">All themes</option>
                 {filterOptions.themes.map((theme) => <option key={theme}>{theme}</option>)}
               </FilterSelect>
+              <FilterSelect label="Department" value={departmentFilter} onChange={setDepartmentFilter}>
+                <option value="">All departments</option>
+                {filterOptions.departments.map((department) => (
+                  <option key={department}>{department}</option>
+                ))}
+              </FilterSelect>
               <FilterSelect label="Survey" value={surveyFilter} onChange={setSurveyFilter}>
                 <option value="">All surveys</option>
                 {filterOptions.surveys.map((survey) => <option key={survey}>{survey}</option>)}
@@ -392,6 +404,7 @@ export default function FeedbackPage() {
                   setSeverityFilter,
                   setSentimentFilter,
                   setThemeFilter,
+                  setDepartmentFilter,
                   setSurveyFilter,
                   setQuestionFilter,
                   setDateFilter,
@@ -531,7 +544,7 @@ function CommentCard({ item, showAnalysis }: { item: FeedbackItem; showAnalysis:
       <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1 border-t border-slate-100 pt-3 text-xs text-slate-400">
         <span>{item.source === "survey" ? "Survey comment" : "Standalone feedback"}</span>
         {item.survey && <span>{item.survey.title}</span>}
-        {item.department && <span>{item.department.name}</span>}
+        <span>{departmentLabel(item)}</span>
         <span>{formatDate(item.createdAt)}</span>
         {analysis && <span>{Math.round(analysis.confidence * 100)}% analysis confidence</span>}
         {analysis && (
@@ -629,11 +642,21 @@ function unique(values: string[]) {
   return [...new Set(values)].sort((a, b) => a.localeCompare(b));
 }
 
+function departmentLabel(item: FeedbackItem) {
+  if (item.department) return `Department: ${item.department.name}`;
+  return item.departmentProtected ? "Department protected" : "Department not provided";
+}
+
+function departmentFilterValue(item: FeedbackItem) {
+  return item.department?.name || (item.departmentProtected ? "Department protected" : "Department not provided");
+}
+
 function clearFilters(setters: {
   setSearch: (value: string) => void;
   setSeverityFilter: (value: string) => void;
   setSentimentFilter: (value: string) => void;
   setThemeFilter: (value: string) => void;
+  setDepartmentFilter: (value: string) => void;
   setSurveyFilter: (value: string) => void;
   setQuestionFilter: (value: string) => void;
   setDateFilter: (value: string) => void;
@@ -642,6 +665,7 @@ function clearFilters(setters: {
   setters.setSeverityFilter("");
   setters.setSentimentFilter("");
   setters.setThemeFilter("");
+  setters.setDepartmentFilter("");
   setters.setSurveyFilter("");
   setters.setQuestionFilter("");
   setters.setDateFilter("all");

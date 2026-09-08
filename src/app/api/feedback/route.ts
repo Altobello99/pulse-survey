@@ -45,6 +45,7 @@ export async function GET(request: NextRequest) {
   const data = [
     ...feedback.map((item) => ({
       ...item,
+      departmentProtected: false,
       source: "feedback" as const,
       survey: null,
       question: null,
@@ -114,50 +115,76 @@ async function getSurveyComments(surveyId: string | null, limit: number) {
 
   if (eligibleSurveyIds.length === 0) return [];
 
-  const answers = await prisma.answer.findMany({
-    where: {
-      textValue: { not: null },
-      question: {
-        type: "free_text",
-        surveyId: { in: eligibleSurveyIds },
-      },
-    },
-    select: {
-      id: true,
-      textValue: true,
-      question: {
-        select: {
-          text: true,
-          section: true,
-          survey: { select: { id: true, title: true } },
+  const [answers, departmentResponseCounts] = await Promise.all([
+    prisma.answer.findMany({
+      where: {
+        textValue: { not: null },
+        question: {
+          type: "free_text",
+          surveyId: { in: eligibleSurveyIds },
         },
       },
-      surveyResponse: { select: { submittedAt: true } },
-    },
-    orderBy: { createdAt: "desc" },
-    take: limit,
-  });
+      select: {
+        id: true,
+        textValue: true,
+        question: {
+          select: {
+            text: true,
+            section: true,
+            survey: { select: { id: true, title: true } },
+          },
+        },
+        surveyResponse: {
+          select: {
+            submittedAt: true,
+            surveyId: true,
+            departmentId: true,
+            department: { select: { name: true } },
+          },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+      take: limit,
+    }),
+    prisma.surveyResponse.groupBy({
+      by: ["surveyId", "departmentId"],
+      where: { surveyId: { in: eligibleSurveyIds } },
+      _count: { _all: true },
+    }),
+  ]);
+  const reportableDepartments = new Set(
+    departmentResponseCounts
+      .filter((group) => group._count._all >= ANONYMITY_THRESHOLD)
+      .map((group) => `${group.surveyId}:${group.departmentId}`)
+  );
 
   return answers
     .filter((answer) => Boolean(answer.textValue?.trim()))
-    .map((answer) => ({
-      id: `survey-comment-${answer.id}`,
-      message: answer.textValue!.trim(),
-      category: answer.question.section || "Survey comment",
-      sentiment: null,
-      status: "received",
-      createdAt: answer.surveyResponse.submittedAt,
-      department: null,
-      team: null,
-      source: "survey" as const,
-      survey: answer.question.survey,
-      question: {
-        text: answer.question.text,
-        section: answer.question.section,
-      },
-      analysisSourceType: "survey",
-      analysisSourceId: answer.id,
-    }));
+    .map((answer) => {
+      const departmentIsReportable = reportableDepartments.has(
+        `${answer.surveyResponse.surveyId}:${answer.surveyResponse.departmentId}`
+      );
+
+      return {
+        id: `survey-comment-${answer.id}`,
+        message: answer.textValue!.trim(),
+        category: answer.question.section || "Survey comment",
+        sentiment: null,
+        status: "received",
+        createdAt: answer.surveyResponse.submittedAt,
+        department: departmentIsReportable ? answer.surveyResponse.department : null,
+        departmentProtected: !departmentIsReportable,
+        team: null,
+        source: "survey" as const,
+        survey: answer.question.survey,
+        question: {
+          text: answer.question.text,
+          section: answer.question.section,
+        },
+        analysisSourceType: "survey",
+        analysisSourceId: answer.id,
+      };
+    });
 }
 
 export async function POST(request: NextRequest) {
