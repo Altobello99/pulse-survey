@@ -48,6 +48,7 @@ export default function FeedbackPage() {
   const [questionFilter, setQuestionFilter] = useState("");
   const [dateFilter, setDateFilter] = useState("all");
   const [sortMode, setSortMode] = useState<SortMode>("severity");
+  const [visibleLimit, setVisibleLimit] = useState(50);
 
   function fetchFeedback() {
     fetch("/api/feedback?limit=5000")
@@ -153,6 +154,7 @@ export default function FeedbackPage() {
 
     return [...comments].sort((a, b) => compareComments(a, b, sortMode));
   }, [filteredComments, sortMode, viewMode]);
+  const displayedComments = visibleComments.slice(0, visibleLimit);
 
   const themeSummary = useMemo(() => {
     const themes = new Map<string, {
@@ -423,11 +425,24 @@ export default function FeedbackPage() {
             : "No comments match these filters."}
         </div>
       ) : (
-        <div className="space-y-3">
-          {(isAdmin ? visibleComments : feedbackList).map((item) => (
-            <CommentCard key={item.id} item={item} showAnalysis={isAdmin} />
-          ))}
-        </div>
+        <>
+          <div className="space-y-3">
+            {(isAdmin ? displayedComments : feedbackList).map((item) => (
+              <CommentCard key={item.id} item={item} showAnalysis={isAdmin} />
+            ))}
+          </div>
+          {isAdmin && displayedComments.length < visibleComments.length && (
+            <div className="text-center">
+              <button
+                type="button"
+                onClick={() => setVisibleLimit((current) => current + 50)}
+                className="rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              >
+                Show 50 more ({visibleComments.length - displayedComments.length} remaining)
+              </button>
+            </div>
+          )}
+        </>
       )}
 
       {isAdmin && !loading && (
@@ -518,7 +533,7 @@ function CommentCard({ item, showAnalysis }: { item: FeedbackItem; showAnalysis:
         {item.survey && <span>{item.survey.title}</span>}
         {item.department && <span>{item.department.name}</span>}
         <span>{formatDate(item.createdAt)}</span>
-        {analysis && <span>{Math.round(analysis.confidence * 100)}% AI confidence</span>}
+        {analysis && <span>{Math.round(analysis.confidence * 100)}% analysis confidence</span>}
         {analysis && (
           <span>{analysis.model.startsWith("built-in-") ? "Built-in classifier" : "External AI model"}</span>
         )}

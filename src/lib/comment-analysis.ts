@@ -182,7 +182,10 @@ export async function analyzeStandaloneFeedback(
   }], options);
 }
 
-export async function backfillCommentAnalyses(surveyId?: string) {
+export async function backfillCommentAnalyses(
+  surveyId?: string,
+  options: { force?: boolean; gatewayToken?: string } = {}
+) {
   const [answers, feedback] = await Promise.all([
     prisma.answer.findMany({
       where: {
@@ -221,7 +224,7 @@ export async function backfillCommentAnalyses(surveyId?: string) {
       text: item.message,
       context: `Standalone anonymous feedback; Category: ${item.category || "Other"}`,
     })),
-  ]);
+  ], options);
 }
 
 async function classifyBatch(
@@ -280,18 +283,32 @@ function classifyBatchLocally(comments: CommentForAnalysis[]) {
     model: LOCAL_ANALYSIS_MODEL,
     classifications: comments.map((comment) => ({
       comment,
-      result: classifyCommentLocally(comment.text),
+      result: classifyCommentLocally(comment.text, comment.context),
     })),
   };
 }
 
-function classifyCommentLocally(text: string): {
+function classifyCommentLocally(text: string, context: string): {
   sentiment: CommentSentiment;
   severity: CommentBaseSeverity;
   themes: CommentTheme[];
   confidence: number;
   reason: string;
 } {
+  const compact = text.trim().toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  if (
+    !compact
+    || /^(?:n a|na|none|nothing|nothing to add|no comment|not applicable|idk)$/i.test(compact)
+  ) {
+    return {
+      sentiment: "neutral",
+      severity: "low",
+      themes: ["Other"],
+      confidence: 0.96,
+      reason: "No actionable written feedback was provided.",
+    };
+  }
+
   const normalized = ` ${text.toLowerCase().replace(/[^a-z0-9'&]+/g, " ")} `;
   const positiveScore = countMatches(normalized, [
     /\bappreciat(?:e|ed|ion)\b/g,
@@ -322,6 +339,18 @@ function classifyCommentLocally(text: string): {
     /\bissue\b/g,
     /\bproblem\b/g,
     /\bbroken\b/g,
+    /\binefficient\b/g,
+    /\bunclear\b/g,
+    /\bunprofessional\b/g,
+    /\bblam(?:e|ed|ing)\b/g,
+    /\bfavou?ritism\b/g,
+    /\bmicro ?manag(?:e|ed|ing|ement)\b/g,
+    /\bdeclin(?:e|ed|ing)\b/g,
+    /\bdelay(?:ed|s)?\b/g,
+    /\bfriction\b/g,
+    /\bdamag(?:e|ed|ing)\b/g,
+    /\binjur(?:y|ies|ed)\b/g,
+    /\bwast(?:e|ed|ing)\b/g,
     /\black(?:ing|s)?\b/g,
     /\bnever\b/g,
     /\bcan't\b/g,
@@ -346,11 +375,12 @@ function classifyCommentLocally(text: string): {
     { pattern: /\b(fraud|embezzl(?:e|ed|ement)|briber(?:y|y)|kickback|steal(?:ing)?|theft|falsif(?:y|ied|ication))\b/, reason: "Flags possible fraud or theft language for prompt human review.", theme: "Fraud & Security" },
     { pattern: /\b(data breach|security breach|hacked|ransomware|password leak|confidential data leak|phishing)\b/, reason: "Flags possible data-security exposure for prompt human review.", theme: "Fraud & Security" },
     { pattern: /\b(illegal|regulatory violation|compliance violation|breaking the law|lawsuit)\b/, reason: "Flags possible legal or compliance exposure for prompt human review.", theme: "Legal & Compliance" },
-    { pattern: /\b(serious injury|chemical spill|fire hazard|safety violation|machine guard|contamination|product recall|major outage|production shutdown)\b/, reason: "Flags possible severe safety or operational risk for prompt human review.", theme: "Safety" },
+    { pattern: /\b(serious injur\w*|workplace injur\w*|multiple injur\w*|chemical spill|fire hazard|safety violation|machine guard|contamination|product recall|major outage|production shutdown)\b/, reason: "Flags possible severe safety or operational risk for prompt human review.", theme: "Safety" },
   ];
   const criticalSignal = criticalSignals.find(({ pattern }) => pattern.test(normalized));
-  const highSignal = /\b(retaliat(?:e|ed|ion)|abusive|bully(?:ing|ied)|severely understaffed|burnout|urgent safety|repeat(?:ed)? failure|serious customer risk)\b/.test(normalized);
-  const suggestionSignal = /\b(should|could|recommend|suggest|need|please|idea|improv(?:e|ement)|would help)\b/.test(normalized);
+  const highSignal = /\b(retaliat(?:e|ed|ion)|abusive|bully(?:ing|ied)|severely understaffed|burnout|urgent safety|repeat(?:ed)? failure|serious customer risk|phone while driving|air quality|idling vehicles? inside)\b/.test(normalized);
+  const improvementQuestion = /\b(what one thing|idea or opportunity|improve how|share your thoughts)\b/i.test(context);
+  const suggestionSignal = improvementQuestion || /\b(should|could|recommend|suggest|need|please|idea|improv(?:e|ement)|would help|better|more|less|provide|create|add|remove|increase|decrease|ensure|formalize)\b/.test(normalized);
 
   let severity: CommentBaseSeverity;
   let confidence: number;
