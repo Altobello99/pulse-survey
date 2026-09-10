@@ -36,6 +36,25 @@ export const departmentedBambooEmployeeWhere = {
   ],
 } satisfies Prisma.UserWhereInput;
 
+export function surveyHireDateWhere(surveyStartDate: Date): Prisma.UserWhereInput {
+  return { hireDate: { lt: surveyStartDay(surveyStartDate) } };
+}
+
+export function surveyRosterEmployeeWhere(
+  surveyStartDate: Date
+): Prisma.UserWhereInput {
+  return {
+    AND: [departmentedBambooEmployeeWhere, surveyHireDateWhere(surveyStartDate)],
+  };
+}
+
+export function isOnSurveyOpeningRoster(
+  hireDate: Date | null | undefined,
+  surveyStartDate: Date
+) {
+  return Boolean(hireDate && hireDate < surveyStartDay(surveyStartDate));
+}
+
 export function normalizeEmail(email: string | null | undefined) {
   return (email || "").trim().toLowerCase();
 }
@@ -174,4 +193,10 @@ function applyFilters(where: Prisma.SurveyResponseWhereInput, filters: AccessFil
 
 function unique(values: string[]) {
   return [...new Set(values)];
+}
+
+function surveyStartDay(surveyStartDate: Date) {
+  const date = new Date(surveyStartDate);
+  date.setUTCHours(0, 0, 0, 0);
+  return date;
 }

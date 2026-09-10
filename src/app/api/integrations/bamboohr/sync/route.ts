@@ -36,6 +36,11 @@ export async function POST() {
 async function runSync() {
   try {
     const result = await syncBambooEmployees();
+    console.info("BambooHR sync completed", {
+      ...result,
+      completedAt: new Date().toISOString(),
+      torontoTime: getTorontoTimeLabel(),
+    });
     return Response.json({ data: result });
   } catch (error) {
     const message = error instanceof Error ? error.message : "BambooHR sync failed";

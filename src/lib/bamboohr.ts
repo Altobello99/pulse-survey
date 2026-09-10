@@ -97,6 +97,10 @@ export async function syncBambooEmployees(): Promise<BambooSyncResult> {
     .filter((employee): employee is ReturnType<typeof normalizeEmployee> & { email: string } => Boolean(employee.email))
     .filter((employee) => isActiveBambooEmployee(employee.status, employee.employmentStatus));
 
+  if (normalized.length === 0) {
+    throw new Error("BambooHR returned no active employees; existing employee data was left unchanged");
+  }
+
   const seenEmails = new Set(normalized.map((employee) => employee.email));
   const managerEmails = new Set(
     normalized.map((employee) => employee.managerEmail).filter((email): email is string => Boolean(email))
@@ -175,7 +179,10 @@ export async function syncBambooEmployees(): Promise<BambooSyncResult> {
   const deactivated = await prisma.user.updateMany({
     where: {
       email: { notIn: [...seenEmails] },
-      role: { not: "admin" },
+      OR: [
+        { role: { not: "admin" } },
+        { bambooHrId: { not: null } },
+      ],
     },
     data: {
       status: "inactive",

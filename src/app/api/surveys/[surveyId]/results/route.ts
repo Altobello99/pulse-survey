@@ -9,6 +9,7 @@ import {
   canViewResults,
   getScopedEmployeeWhere,
   getScopedResponseWhere,
+  surveyHireDateWhere,
   type AccessFilters,
 } from "@/lib/access";
 import { groupTeams } from "@/lib/team-groups";
@@ -46,8 +47,9 @@ export async function GET(
     include: { answers: true, department: true, team: true },
   });
 
+  const scopedEmployeeWhere = await getScopedEmployeeWhere(session.user);
   const employeeWhere = applyEmployeeFilters(
-    await getScopedEmployeeWhere(session.user),
+    { AND: [scopedEmployeeWhere, surveyHireDateWhere(survey.startDate)] },
     filters
   );
   const totalEmployees = await prisma.user.count({ where: employeeWhere });
@@ -55,7 +57,7 @@ export async function GET(
     where: { surveyId, user: employeeWhere },
   });
 
-  const filterOptions = await getFilterOptions(session.user);
+  const filterOptions = await getFilterOptions(session.user, survey.startDate);
   const canShowDetailedResults = responses.length >= ANONYMITY_THRESHOLD;
   const standardRatingQuestionIds = survey.questions
     .filter((question) => {
@@ -252,8 +254,10 @@ function applyEmployeeFilters(where: Prisma.UserWhereInput, filters: AccessFilte
   return clauses.length === 1 ? where : { AND: clauses };
 }
 
-async function getFilterOptions(user: Session["user"]) {
-  const employeeWhere = await getScopedEmployeeWhere(user);
+async function getFilterOptions(user: Session["user"], surveyStartDate: Date) {
+  const employeeWhere = {
+    AND: [await getScopedEmployeeWhere(user), surveyHireDateWhere(surveyStartDate)],
+  };
   const employees = await prisma.user.findMany({
     where: employeeWhere,
     select: {

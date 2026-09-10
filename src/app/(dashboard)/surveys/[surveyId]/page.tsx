@@ -2,6 +2,7 @@
 
 import { useEffect, useState, use } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 
 interface Question {
   id: string;
@@ -26,6 +27,8 @@ interface Survey {
   title: string;
   description: string | null;
   completed: boolean;
+  eligible: boolean;
+  eligibilityMessage: string | null;
   status: string;
   startDate: string;
   endDate: string;
@@ -225,6 +228,31 @@ export default function TakeSurveyPage({ params }: { params: Promise<{ surveyId:
     );
   }
 
+  if (!survey.eligible) {
+    return (
+      <div className="max-w-2xl mx-auto">
+        <div className="bg-white rounded-xl border border-slate-200 p-12 text-center">
+          <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-4">
+            <svg className="w-8 h-8 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M5.07 19h13.86a2 2 0 001.73-3L13.73 4a2 2 0 00-3.46 0L3.34 16a2 2 0 001.73 3z" />
+            </svg>
+          </div>
+          <h2 className="text-xl font-bold text-slate-900 mb-2">Not eligible for this survey</h2>
+          <p className="text-slate-500 mb-6">
+            {survey.eligibilityMessage ||
+              "This survey is limited to employees who were active before it opened."}
+          </p>
+          <button
+            onClick={() => router.push("/surveys")}
+            className="px-6 py-2.5 bg-primary text-white rounded-lg hover:bg-primary-dark transition"
+          >
+            Back to Surveys
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   const teamsForShiftMenu = (survey.demographicOptions?.teams || []).filter(
     (team) => !departmentId || team.departmentId === departmentId
   );
@@ -237,7 +265,13 @@ export default function TakeSurveyPage({ params }: { params: Promise<{ surveyId:
       <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
         <div className="bg-slate-950 text-white p-6">
           <div className="flex items-center gap-3">
-            <img src="/logo.svg" alt="Employee Pulse Survey" className="w-12 h-12 rounded-xl" />
+            <Image
+              src="/logo.svg"
+              alt="Employee Pulse Survey"
+              width={48}
+              height={48}
+              className="w-12 h-12 rounded-xl"
+            />
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-teal-200">Clutch</p>
               <h1 className="text-2xl font-bold">{survey.title}</h1>

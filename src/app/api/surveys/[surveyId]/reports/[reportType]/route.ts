@@ -4,7 +4,7 @@ import * as XLSX from "xlsx";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { ANONYMITY_THRESHOLD } from "@/lib/constants";
-import { departmentedBambooEmployeeWhere } from "@/lib/access";
+import { surveyRosterEmployeeWhere } from "@/lib/access";
 import { groupTeams, teamGroupIdentity } from "@/lib/team-groups";
 import type { Prisma } from "@/generated/prisma/client";
 
@@ -162,7 +162,10 @@ async function buildReportContext(
   if (!survey) return null;
 
   const responseWhere = applyResponseFilters({ surveyId }, filters);
-  const employeeWhere = applyEmployeeFilters(departmentedBambooEmployeeWhere, filters);
+  const employeeWhere = applyEmployeeFilters(
+    surveyRosterEmployeeWhere(survey.startDate),
+    filters
+  );
 
   const [responses, employees, completions] = await Promise.all([
     prisma.surveyResponse.findMany({
@@ -259,7 +262,7 @@ function buildExecutiveSummary(context: ReportContext): ReportSheet[] {
     ...summaryRows(context),
     [],
     ["Metric", "Value"],
-    ["Active employees in scope", metrics.totalEmployees],
+    ["Eligible employees in scope", metrics.totalEmployees],
     ["Completed surveys", metrics.completions],
     ["Anonymous responses", metrics.responses],
     ["Participation rate", `${metrics.participationRate}%`],
@@ -592,7 +595,7 @@ function participationSummaryRows(context: ReportContext): CellValue[][] {
   const metrics = getOverallMetrics(context);
   return [
     ["Metric", "Value"],
-    ["Employees in scope", metrics.totalEmployees],
+    ["Eligible employees in scope", metrics.totalEmployees],
     ["Completed", metrics.completions],
     ["Incomplete", Math.max(metrics.totalEmployees - metrics.completions, 0)],
     ["Anonymous responses", metrics.responses],
@@ -604,7 +607,7 @@ function completionSummaryRows(context: ReportContext): CellValue[][] {
   const completed = new Set(context.completions.map((completion) => completion.userId));
   return [
     ["Metric", "Value"],
-    ["Employees in scope", context.employees.length],
+    ["Eligible employees in scope", context.employees.length],
     ["Completed", completed.size],
     ["Not completed", context.employees.filter((employee) => !completed.has(employee.id)).length],
     ["Completion rate", context.employees.length ? `${Math.round((completed.size / context.employees.length) * 100)}%` : "0%"],

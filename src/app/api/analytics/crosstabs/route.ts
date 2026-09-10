@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { ANONYMITY_THRESHOLD } from "@/lib/constants";
-import { departmentedBambooEmployeeWhere } from "@/lib/access";
+import { surveyRosterEmployeeWhere } from "@/lib/access";
 
 // Cross-tab analytics: slice survey results by department, tenure bracket, and job level
 export async function GET(req: NextRequest) {
@@ -15,6 +15,12 @@ export async function GET(req: NextRequest) {
   const surveyId = req.nextUrl.searchParams.get("surveyId");
   if (!surveyId) return Response.json({ error: "Missing surveyId" }, { status: 400 });
 
+  const survey = await prisma.survey.findUnique({
+    where: { id: surveyId },
+    select: { startDate: true },
+  });
+  if (!survey) return Response.json({ error: "Survey not found" }, { status: 404 });
+
   const responses = await prisma.surveyResponse.findMany({
     where: { surveyId },
     include: {
@@ -25,7 +31,7 @@ export async function GET(req: NextRequest) {
 
   // Get all users for tenure + level data (linked by department/team, not by response)
   const users = await prisma.user.findMany({
-    where: departmentedBambooEmployeeWhere,
+    where: surveyRosterEmployeeWhere(survey.startDate),
     select: { departmentId: true, teamId: true, hireDate: true, jobLevel: true },
   });
 
@@ -51,7 +57,7 @@ export async function GET(req: NextRequest) {
   }
 
   const departmentData = Object.entries(byDepartment)
-    .filter(([_, d]) => d.count >= ANONYMITY_THRESHOLD)
+    .filter(([, department]) => department.count >= ANONYMITY_THRESHOLD)
     .map(([name, d]) => ({
       name,
       count: d.count,

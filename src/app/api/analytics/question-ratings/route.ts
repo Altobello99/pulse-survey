@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { departmentedBambooEmployeeWhere } from "@/lib/access";
+import { surveyRosterEmployeeWhere } from "@/lib/access";
 import { ANONYMITY_THRESHOLD } from "@/lib/constants";
 import {
   DEPARTMENT_GROUPS,
@@ -54,39 +54,39 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const [survey, activeEmployees] = await Promise.all([
-    prisma.survey.findUnique({
-      where: { id: surveyId },
-      select: {
-        id: true,
-        title: true,
-        questions: {
-          orderBy: { order: "asc" },
-          select: {
-            id: true,
-            text: true,
-            section: true,
-            type: true,
-            order: true,
-            options: true,
-          },
+  const survey = await prisma.survey.findUnique({
+    where: { id: surveyId },
+    select: {
+      id: true,
+      title: true,
+      startDate: true,
+      questions: {
+        orderBy: { order: "asc" },
+        select: {
+          id: true,
+          text: true,
+          section: true,
+          type: true,
+          order: true,
+          options: true,
         },
       },
-    }),
-    prisma.user.findMany({
-      where: departmentedBambooEmployeeWhere,
-      select: {
-        id: true,
-        departmentId: true,
-        location: true,
-        department: { select: { name: true } },
-      },
-    }),
-  ]);
+    },
+  });
 
   if (!survey) {
     return Response.json({ error: "Survey not found" }, { status: 404 });
   }
+
+  const activeEmployees = await prisma.user.findMany({
+    where: surveyRosterEmployeeWhere(survey.startDate),
+    select: {
+      id: true,
+      departmentId: true,
+      location: true,
+      department: { select: { name: true } },
+    },
+  });
 
   const ratingQuestions = survey.questions.filter((question) => question.type === "rating");
   const enpsQuestion = ratingQuestions.find((question) => {

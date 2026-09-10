@@ -2,6 +2,19 @@ import { NextRequest } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import {
+  departmentedBambooEmployeeWhere,
+  isOnSurveyOpeningRoster,
+  surveyRosterEmployeeWhere,
+} from "@/lib/access";
+
+type SurveyQuestionInput = {
+  text: string;
+  section?: string | null;
+  type: string;
+  required?: boolean;
+  options?: unknown[] | null;
+};
 
 export async function GET() {
   const session = await getServerSession(authOptions);
@@ -20,12 +33,35 @@ export async function GET() {
     select: { surveyId: true },
   });
   const completedIds = new Set(completions.map((c) => c.surveyId));
+  const eligibleCompletionCounts = await Promise.all(
+    surveys.map((survey) =>
+      prisma.surveyCompletion.count({
+        where: {
+          surveyId: survey.id,
+          user: surveyRosterEmployeeWhere(survey.startDate),
+        },
+      })
+    )
+  );
+  const employee = await prisma.user.findFirst({
+    where: { AND: [departmentedBambooEmployeeWhere, { id: session.user.id }] },
+    select: { hireDate: true },
+  });
+  const withEmployeeStatus = surveys.map((survey, index) => ({
+    ...survey,
+    _count: {
+      ...survey._count,
+      completions: eligibleCompletionCounts[index],
+    },
+    completed: completedIds.has(survey.id),
+    eligible: isOnSurveyOpeningRoster(employee?.hireDate, survey.startDate),
+  }));
 
   // Employees only see surveys that are actively open right now. Historical,
   // draft, and closed surveys are admin/manager-only.
   if (session.user.role === "employee") {
     const now = new Date();
-    const filtered = surveys.filter(
+    const filtered = withEmployeeStatus.filter(
       (s) =>
         s.status === "active" &&
         new Date(s.startDate) <= now &&
@@ -33,18 +69,12 @@ export async function GET() {
     );
 
     return Response.json({
-      data: filtered.map((s) => ({
-        ...s,
-        completed: completedIds.has(s.id),
-      })),
+      data: filtered,
     });
   }
 
   return Response.json({
-    data: surveys.map((s) => ({
-      ...s,
-      completed: completedIds.has(s.id),
-    })),
+    data: withEmployeeStatus,
   });
 }
 
@@ -54,7 +84,15 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const body = await request.json();
+  const body = (await request.json()) as {
+    title?: string;
+    description?: string | null;
+    frequency?: string | null;
+    startDate?: string;
+    endDate?: string;
+    status?: string;
+    questions?: SurveyQuestionInput[];
+  };
   const { title, description, frequency, startDate, endDate, status, questions } = body;
 
   if (!title || !startDate || !endDate) {
@@ -71,7 +109,7 @@ export async function POST(request: NextRequest) {
       status: status || "draft",
       createdById: session.user.id,
       questions: {
-        create: (questions || []).map((q: any, i: number) => ({
+        create: (questions || []).map((q, i) => ({
           text: q.text,
           section: q.section?.trim() || null,
           type: q.type,

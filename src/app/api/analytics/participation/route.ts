@@ -1,7 +1,11 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getScopedEmployeeWhere, getScopedResponseWhere } from "@/lib/access";
+import {
+  getScopedEmployeeWhere,
+  getScopedResponseWhere,
+  surveyHireDateWhere,
+} from "@/lib/access";
 import { ANONYMITY_THRESHOLD } from "@/lib/constants";
 
 export async function GET() {
@@ -22,20 +26,24 @@ export async function GET() {
     },
   });
 
-  const employeeWhere = await getScopedEmployeeWhere(session.user);
-  const totalEmployees = await prisma.user.count({ where: employeeWhere });
+  const scopedEmployeeWhere = await getScopedEmployeeWhere(session.user);
 
   const data = await Promise.all(
     surveys.map(async (s) => {
-      const [responseCount, completionRows] = await Promise.all([
+      const employeeWhere = {
+        AND: [scopedEmployeeWhere, surveyHireDateWhere(s.startDate)],
+      };
+      const responseWhere = await getScopedResponseWhere(session.user, s.id);
+      const [responseCount, completionRows, totalEmployees] = await Promise.all([
         prisma.surveyResponse.count({
-          where: await getScopedResponseWhere(session.user, s.id),
+          where: responseWhere,
         }),
         prisma.surveyCompletion.findMany({
           where: { surveyId: s.id, user: employeeWhere },
           select: { completedAt: true },
           orderBy: { completedAt: "asc" },
         }),
+        prisma.user.count({ where: employeeWhere }),
       ]);
       const completions = completionRows.length;
       const hidden = session.user.role !== "admin" && responseCount < ANONYMITY_THRESHOLD;

@@ -13,6 +13,7 @@ interface Survey {
   startDate: string;
   endDate: string;
   completed?: boolean;
+  eligible?: boolean;
   _count: { responses: number };
 }
 
@@ -76,7 +77,9 @@ export default function SurveysPage() {
           {surveys.map((survey) => {
             const scheduled = isScheduled(survey);
             const closed = isClosed(survey);
-            const canTake = !survey.completed && !scheduled && !closed && !isAdminPortal;
+            const notEligible = !isAdminPortal && survey.eligible === false;
+            const canTake =
+              !survey.completed && !scheduled && !closed && !notEligible && !isAdminPortal;
 
             return (
               <div
@@ -112,6 +115,11 @@ export default function SurveysPage() {
                           Closed
                         </span>
                       )}
+                      {!survey.completed && notEligible && !closed && (
+                        <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600">
+                          Not eligible
+                        </span>
+                      )}
                     </div>
                     {survey.description && (
                       <p className="text-sm text-slate-500 mb-2">
@@ -144,6 +152,11 @@ export default function SurveysPage() {
                       >
                         View Status
                       </Link>
+                    )}
+                    {!survey.completed && notEligible && !closed && (
+                      <span className="px-4 py-2 bg-slate-100 text-slate-600 text-sm font-medium rounded-lg">
+                        Not eligible
+                      </span>
                     )}
                     {survey.completed && (
                       <span className="px-4 py-2 bg-blue-50 text-blue-700 text-sm font-medium rounded-lg">

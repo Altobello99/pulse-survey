@@ -3,6 +3,19 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getEligibleSurveyDemographics } from "@/lib/demographic-options";
+import {
+  departmentedBambooEmployeeWhere,
+  isOnSurveyOpeningRoster,
+} from "@/lib/access";
+import type { Prisma } from "@/generated/prisma/client";
+
+type SurveyQuestionInput = {
+  text: string;
+  section?: string | null;
+  type: string;
+  required?: boolean;
+  options?: unknown[] | null;
+};
 
 export async function GET(
   _req: NextRequest,
@@ -27,7 +40,12 @@ export async function GET(
     where: { userId_surveyId: { userId: session.user.id, surveyId } },
   });
   const completed = !!completion;
-  const demographicOptions = await getEligibleSurveyDemographics();
+  const employee = await prisma.user.findFirst({
+    where: { AND: [departmentedBambooEmployeeWhere, { id: session.user.id }] },
+    select: { hireDate: true },
+  });
+  const eligible = isOnSurveyOpeningRoster(employee?.hireDate, survey.startDate);
+  const demographicOptions = await getEligibleSurveyDemographics(survey.startDate);
   const currentDepartmentId = demographicOptions.departments.some(
     (department) => department.id === session.user.departmentId
   )
@@ -53,6 +71,10 @@ export async function GET(
     data: {
       ...survey,
       completed,
+      eligible,
+      eligibilityMessage: eligible
+        ? null
+        : "This survey is limited to employees who were active before it opened.",
       demographicOptions: {
         ...demographicOptions,
         currentDepartmentId,
@@ -74,10 +96,18 @@ export async function PUT(
   }
 
   const { surveyId } = await params;
-  const body = await request.json();
+  const body = (await request.json()) as {
+    title?: string;
+    description?: string | null;
+    frequency?: string | null;
+    startDate?: string;
+    endDate?: string;
+    status?: string;
+    questions?: SurveyQuestionInput[];
+  };
   const { title, description, frequency, startDate, endDate, status, questions } = body;
 
-  const updateData: any = {};
+  const updateData: Prisma.SurveyUpdateInput = {};
   if (title !== undefined) updateData.title = title;
   if (description !== undefined) updateData.description = description;
   if (frequency !== undefined) updateData.frequency = frequency;
@@ -94,7 +124,7 @@ export async function PUT(
   if (questions) {
     await prisma.question.deleteMany({ where: { surveyId } });
     await prisma.question.createMany({
-      data: questions.map((q: any, i: number) => ({
+      data: questions.map((q, i) => ({
         surveyId,
         text: q.text,
         section: q.section?.trim() || null,

@@ -1,7 +1,10 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { departmentedBambooEmployeeWhere } from "@/lib/access";
+import {
+  departmentedBambooEmployeeWhere,
+  surveyRosterEmployeeWhere,
+} from "@/lib/access";
 import { ANONYMITY_THRESHOLD } from "@/lib/constants";
 
 export async function GET() {
@@ -10,9 +13,24 @@ export async function GET() {
     return Response.json({ error: "Forbidden" }, { status: 403 });
   }
 
+  const latestSurvey = await prisma.survey.findFirst({
+    where: { status: { in: ["active", "closed"] } },
+    orderBy: { startDate: "desc" },
+    select: {
+      id: true,
+      startDate: true,
+      questions: {
+        where: { type: "rating" },
+        select: { id: true, options: true },
+      },
+    },
+  });
+  const surveyEmployeeWhere = latestSurvey
+    ? surveyRosterEmployeeWhere(latestSurvey.startDate)
+    : departmentedBambooEmployeeWhere;
   const departmentCounts = await prisma.user.groupBy({
     by: ["departmentId"],
-    where: departmentedBambooEmployeeWhere,
+    where: surveyEmployeeWhere,
     _count: { _all: true },
   });
   const employeeCountsByDepartment = new Map(
@@ -25,18 +43,6 @@ export async function GET() {
     },
     orderBy: { name: "asc" },
   });
-
-  const latestSurvey = await prisma.survey.findFirst({
-    where: { status: { in: ["active", "closed"] } },
-    orderBy: { startDate: "desc" },
-    select: {
-      id: true,
-      questions: {
-        where: { type: "rating" },
-        select: { id: true, options: true },
-      },
-    },
-  });
   const standardRatingQuestionIds = (latestSurvey?.questions || [])
     .filter((question) => {
       const scale = ratingOptions(question.options);
@@ -48,7 +54,7 @@ export async function GET() {
     departments.map(async (dept) => {
       const employeeCount = employeeCountsByDepartment.get(dept.id) || 0;
       const employeeWhere = {
-        AND: [departmentedBambooEmployeeWhere, { departmentId: dept.id }],
+        AND: [surveyEmployeeWhere, { departmentId: dept.id }],
       };
       const recentCompletions = latestSurvey
         ? await prisma.surveyCompletion.count({

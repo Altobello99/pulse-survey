@@ -2,7 +2,10 @@ import { after, NextRequest } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { departmentedBambooEmployeeWhere } from "@/lib/access";
+import {
+  departmentedBambooEmployeeWhere,
+  isOnSurveyOpeningRoster,
+} from "@/lib/access";
 import {
   getAnonymousFallbackDepartmentId,
   getEligibleSurveyDemographics,
@@ -49,6 +52,7 @@ export async function POST(
       teamId: true,
       location: true,
       managerEmail: true,
+      hireDate: true,
     },
   });
   if (!employee) {
@@ -83,6 +87,13 @@ export async function POST(
     return Response.json({ error: "Survey not available" }, { status: 400 });
   }
 
+  if (!isOnSurveyOpeningRoster(employee.hireDate, survey.startDate)) {
+    return Response.json(
+      { error: "This survey is limited to employees who were active before it opened." },
+      { status: 403 }
+    );
+  }
+
   const body = (await request.json().catch(() => null)) as {
     answers?: unknown[];
     departmentId?: string | null;
@@ -98,7 +109,7 @@ export async function POST(
     return Response.json({ error: answerValidation.error }, { status: 400 });
   }
 
-  const demographicOptions = await getEligibleSurveyDemographics();
+  const demographicOptions = await getEligibleSurveyDemographics(survey.startDate);
   const eligibleDepartmentIds = new Set(
     demographicOptions.departments.map((department) => department.id)
   );
