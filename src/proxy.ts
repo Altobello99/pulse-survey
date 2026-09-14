@@ -36,7 +36,9 @@ export async function proxy(request: NextRequest) {
       return response;
     }
     if (token && pathname === "/login") {
-      return NextResponse.redirect(new URL("/fresh-login", request.url));
+      return NextResponse.redirect(
+        new URL(isExternalAppEntry(request) ? "/fresh-login" : "/dashboard", request.url)
+      );
     }
     const response = NextResponse.next();
     if (pathname === "/login" || pathname === "/reset-cache" || pathname === "/manifest.json" || pathname === "/sw.js") {
@@ -76,7 +78,9 @@ export async function proxy(request: NextRequest) {
   }
 
   const response = NextResponse.next();
-  if (hasAuthenticationReturnBypass) {
+  // /dashboard immediately redirects to the role-specific home page. Keep the
+  // one-use bypass through that redirect and consume it on the destination.
+  if (hasAuthenticationReturnBypass && pathname !== "/dashboard") {
     response.cookies.set(AUTH_ENTRY_BYPASS_COOKIE, "", {
       expires: new Date(0),
       maxAge: 0,

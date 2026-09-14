@@ -2,7 +2,6 @@
 
 import { getProviders, signIn, type ClientSafeProvider } from "next-auth/react";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 const authErrorMessages: Record<string, string> = {
@@ -13,7 +12,6 @@ const authErrorMessages: Record<string, string> = {
 };
 
 export default function LoginPage() {
-  const router = useRouter();
   const [userId, setUserId] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -48,8 +46,7 @@ export default function LoginPage() {
       setError("Invalid user ID or password");
       setLoading(false);
     } else {
-      router.push("/dashboard");
-      router.refresh();
+      window.location.replace("/login?authenticated=1");
     }
   }
 
