@@ -3,7 +3,7 @@
   "short_name": "Employee Pulse Survey",
   "description": "Anonymous employee pulse survey",
   "id": "/",
-  "start_url": "/",
+  "start_url": "/fresh-login",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",

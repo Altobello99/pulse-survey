@@ -1,6 +1,7 @@
 "use client";
 
 import { getProviders, signIn, type ClientSafeProvider } from "next-auth/react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -55,7 +56,7 @@ export default function LoginPage() {
   async function handleGoogleSignIn() {
     setGoogleLoading(true);
     setError("");
-    await signIn("google", { callbackUrl: "/dashboard" });
+    await signIn("google", { callbackUrl: "/login?authenticated=1" });
     setGoogleLoading(false);
   }
 
@@ -63,7 +64,13 @@ export default function LoginPage() {
     <div className="min-h-full flex items-center justify-center bg-gradient-to-br from-teal-50 to-blue-50 px-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <img src="/logo.svg" alt="Employee Pulse Survey" className="inline-block w-16 h-16 mb-4" />
+          <Image
+            src="/logo.svg"
+            alt="Employee Pulse Survey"
+            width={64}
+            height={64}
+            className="inline-block w-16 h-16 mb-4"
+          />
           <h1 className="text-3xl font-bold text-slate-900">Employee Pulse Survey</h1>
           <p className="text-slate-500 mt-2">
             Anonymous employee feedback
