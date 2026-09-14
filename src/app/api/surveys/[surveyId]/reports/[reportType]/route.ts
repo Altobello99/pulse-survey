@@ -5,10 +5,14 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { ANONYMITY_THRESHOLD } from "@/lib/constants";
 import { surveyRosterEmployeeWhere } from "@/lib/access";
+import { buildDecisionReportData } from "@/lib/decision-report-analytics";
 import { groupTeams, teamGroupIdentity } from "@/lib/team-groups";
 import type { Prisma } from "@/generated/prisma/client";
 
 type ReportType =
+  | "department-site"
+  | "leader-breakdown"
+  | "company-question-averages"
   | "executive-summary"
   | "participation"
   | "question-results"
@@ -52,6 +56,7 @@ type CommentAnalysisForReport = {
   model: string;
   analyzedAt: Date;
 };
+type ManagerDirectoryEntry = { email: string; name: string };
 type ReportFilters = {
   departmentId?: string | null;
   division?: string | null;
@@ -73,9 +78,13 @@ type ReportContext = {
   employees: EmployeeForReport[];
   completions: CompletionForReport[];
   commentAnalyses: CommentAnalysisForReport[];
+  managerDirectory: ManagerDirectoryEntry[];
 };
 
 const reportLabels: Record<ReportType, string> = {
+  "department-site": "Department by Site",
+  "leader-breakdown": "Breakdown by Leader",
+  "company-question-averages": "Company Question Averages",
   "executive-summary": "Executive Summary",
   participation: "Participation Report",
   "question-results": "Question-by-Question Results",
@@ -215,6 +224,19 @@ async function buildReportContext(
         },
       })
     : [];
+  const managerEmails = [
+    ...new Set(
+      [...employees, ...responses]
+        .map((record) => normalizeEmail(record.managerEmail))
+        .filter(Boolean)
+    ),
+  ];
+  const managerDirectory = managerEmails.length
+    ? await prisma.user.findMany({
+        where: { email: { in: managerEmails } },
+        select: { email: true, name: true },
+      })
+    : [];
 
   return {
     reportType,
@@ -228,11 +250,18 @@ async function buildReportContext(
     employees,
     completions,
     commentAnalyses,
+    managerDirectory,
   };
 }
 
 function buildReportSheets(context: ReportContext, reportType: ReportType): ReportSheet[] {
   switch (reportType) {
+    case "department-site":
+      return buildDepartmentSiteReport(context);
+    case "leader-breakdown":
+      return buildLeaderBreakdownReport(context);
+    case "company-question-averages":
+      return buildCompanyQuestionAveragesReport(context);
     case "executive-summary":
       return buildExecutiveSummary(context);
     case "participation":
@@ -252,6 +281,195 @@ function buildReportSheets(context: ReportContext, reportType: ReportType): Repo
     case "non-completion":
       return buildNonCompletionReport(context);
   }
+}
+
+function buildDepartmentSiteReport(context: ReportContext): ReportSheet[] {
+  const data = getDecisionReportData(context);
+  const toRows = (groupType?: "production" | "department") => {
+    const rows: CellValue[][] = [
+      ...summaryRows(context),
+      [],
+      [
+        "Department / Group",
+        "Site",
+        "Eligible Employees",
+        "Completed",
+        "Responses",
+        "Participation Rate",
+        "Average Rating",
+        "Rating Scale",
+        "Suppression",
+      ],
+    ];
+
+    for (const row of data.departmentSites.filter(
+      (item) => !groupType || item.groupType === groupType
+    )) {
+      rows.push([
+        row.departmentName,
+        row.site,
+        row.employeeCount,
+        row.completions,
+        row.responses,
+        `${row.participationRate}%`,
+        row.suppressed ? "Suppressed" : row.averageRating,
+        "Out of 5",
+        row.suppressed ? `Fewer than ${ANONYMITY_THRESHOLD} responses` : "",
+      ]);
+    }
+    return rows;
+  };
+  const productionRows = data.departmentSites.filter((row) => row.groupType === "production");
+
+  return [
+    { name: "Production by Site", rows: toRows("production") },
+    { name: "Departments by Site", rows: toRows("department") },
+    {
+      name: "Charts",
+      rows: chartRows(
+        productionRows
+          .filter((row) => !row.suppressed)
+          .map((row) => [`Production - ${row.siteLabel}`, row.participationRate])
+      ),
+    },
+  ];
+}
+
+function buildLeaderBreakdownReport(context: ReportContext): ReportSheet[] {
+  const data = getDecisionReportData(context);
+  const summary: CellValue[][] = [
+    ...summaryRows(context),
+    [],
+    [
+      "Leader",
+      "Leader Email",
+      "Eligible Employees",
+      "Completed",
+      "Incomplete",
+      "Responses",
+      "Participation Rate",
+      "Average Rating",
+      "Rating Scale",
+      "Suppression",
+    ],
+  ];
+  const questions: CellValue[][] = [
+    ...summaryRows(context),
+    [],
+    [
+      "Leader",
+      "Leader Email",
+      "Question Number",
+      "Section",
+      "Question",
+      "Responses",
+      "Actual Average",
+      "Scale",
+      "eNPS",
+      "Suppression",
+    ],
+  ];
+
+  for (const leader of data.leaders) {
+    summary.push([
+      leader.name,
+      leader.email || "",
+      leader.employeeCount,
+      leader.completions,
+      Math.max(leader.employeeCount - leader.completions, 0),
+      leader.responses,
+      `${leader.participationRate}%`,
+      leader.suppressed ? "Suppressed" : leader.averageRating,
+      "Out of 5",
+      leader.suppressed ? `Fewer than ${ANONYMITY_THRESHOLD} responses` : "",
+    ]);
+
+    for (const question of leader.questionAverages) {
+      questions.push([
+        leader.name,
+        leader.email || "",
+        question.order + 1,
+        question.section || "",
+        question.question,
+        question.responses,
+        question.suppressed ? "Suppressed" : question.average,
+        `${question.scaleMin}-${question.scaleMax}`,
+        question.isEnps && !question.suppressed ? question.enpsScore : "",
+        question.suppressed ? `Fewer than ${ANONYMITY_THRESHOLD} responses` : "",
+      ]);
+    }
+  }
+
+  return [
+    { name: "Leader Summary", rows: summary },
+    { name: "Question Ratings", rows: questions },
+    {
+      name: "Charts",
+      rows: chartRows(
+        data.leaders
+          .filter((leader) => !leader.suppressed)
+          .map((leader) => [leader.name, leader.participationRate])
+      ),
+    },
+  ];
+}
+
+function buildCompanyQuestionAveragesReport(context: ReportContext): ReportSheet[] {
+  const data = getDecisionReportData(context);
+  const rows: CellValue[][] = [
+    ...summaryRows(context),
+    [],
+    [
+      "Question Number",
+      "Section",
+      "Question",
+      "Responses",
+      "Actual Average",
+      "Scale Minimum",
+      "Scale Maximum",
+      "eNPS",
+      "Suppression",
+    ],
+  ];
+
+  for (const question of data.questionAverages) {
+    rows.push([
+      question.order + 1,
+      question.section || "",
+      question.question,
+      question.responses,
+      question.suppressed ? "Suppressed" : question.average,
+      question.scaleMin,
+      question.scaleMax,
+      question.isEnps && !question.suppressed ? question.enpsScore : "",
+      question.suppressed ? `Fewer than ${ANONYMITY_THRESHOLD} responses` : "",
+    ]);
+  }
+
+  return [
+    { name: "Question Averages", rows },
+    {
+      name: "Charts",
+      rows: chartRows(
+        data.questionAverages
+          .filter((question) => !question.suppressed && question.average !== null)
+          .map((question) => [
+            `Q${question.order + 1} (out of ${question.scaleMax})`,
+            question.average || 0,
+          ])
+      ),
+    },
+  ];
+}
+
+function getDecisionReportData(context: ReportContext) {
+  return buildDecisionReportData({
+    questions: context.survey.questions,
+    employees: context.employees,
+    responses: context.responses,
+    completions: context.completions,
+    managerDirectory: context.managerDirectory,
+  });
 }
 
 function buildExecutiveSummary(context: ReportContext): ReportSheet[] {
@@ -415,7 +633,7 @@ function buildManagerScopedReport(context: ReportContext): ReportSheet[] {
       employees.some((employee) => employee.id === completion.userId)
     );
     const responses = context.responses.filter((response) => normalizeEmail(response.managerEmail) === managerEmail);
-    const ratings = ratingValues(responses);
+    const ratings = ratingValues(context, responses);
     const suppressed = responses.length < ANONYMITY_THRESHOLD;
     rows.push([
       managerEmail,
@@ -629,7 +847,7 @@ function breakdownRows(context: ReportContext, groupBy: "department" | "division
       suppressed ? `Suppressed (<${ANONYMITY_THRESHOLD})` : group.completions.length,
       suppressed ? `Suppressed (<${ANONYMITY_THRESHOLD})` : group.responses.length,
       suppressed || group.employees.length === 0 ? "Suppressed" : `${Math.round((group.completions.length / group.employees.length) * 100)}%`,
-      suppressed ? "Suppressed" : average(ratingValues(group.responses)),
+      suppressed ? "Suppressed" : average(ratingValues(context, group.responses)),
       suppressed ? `Fewer than ${ANONYMITY_THRESHOLD} responses` : "",
     ]);
   }
@@ -693,7 +911,7 @@ function completionGroupRows(context: ReportContext, groupBy: "department" | "di
 }
 
 function getOverallMetrics(context: ReportContext) {
-  const ratings = ratingValues(context.responses);
+  const ratings = ratingValues(context, context.responses);
   const comments = context.responses.flatMap((response) =>
     response.answers
       .map((answer) => answer.textValue)
@@ -765,7 +983,7 @@ function participationChartData(context: ReportContext): [string, number][] {
 function breakdownChartData(context: ReportContext, groupBy: "department" | "division" | "team" | "location"): [string, number][] {
   return groupSurveyData(context, groupBy)
     .filter((group) => group.responses.length >= ANONYMITY_THRESHOLD)
-    .map((group) => [group.name, average(ratingValues(group.responses))]);
+    .map((group) => [group.name, average(ratingValues(context, group.responses))]);
 }
 
 function questionChartData(context: ReportContext): [string, number][] {
@@ -803,9 +1021,19 @@ function answersForQuestion(context: ReportContext, questionId: string) {
   );
 }
 
-function ratingValues(responses: ReportContext["responses"]) {
+function ratingValues(context: ReportContext, responses: ReportContext["responses"]) {
+  const standardQuestionIds = new Set(
+    context.survey.questions
+      .filter((question) => {
+        if (question.type !== "rating") return false;
+        const scale = ratingOptions(question);
+        return Math.min(...scale) === 1 && Math.max(...scale) === 5;
+      })
+      .map((question) => question.id)
+  );
   return responses
     .flatMap((response) => response.answers)
+    .filter((answer) => standardQuestionIds.has(answer.questionId))
     .map((answer) => answer.ratingValue)
     .filter((value): value is number => value !== null);
 }

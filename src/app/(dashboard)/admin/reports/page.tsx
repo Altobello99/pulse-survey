@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { DecisionReports } from "@/components/reports/DecisionReports";
 import { REPORT_DOWNLOADS } from "@/lib/report-downloads";
 import { formatDate } from "@/lib/utils";
 
@@ -122,31 +123,41 @@ export default function AdminReportsPage() {
             </Link>
           </div>
 
-          <div className="divide-y divide-slate-100">
-            {REPORT_DOWNLOADS.map((report) => (
-              <div key={report.type} className="p-5">
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                  <div className="min-w-0">
-                    <h3 className="font-medium text-slate-900">{report.label}</h3>
-                    <p className="text-sm text-slate-500">{report.description}</p>
-                  </div>
-                  <div className="flex shrink-0 flex-wrap gap-2">
-                    <a
-                      href={reportHref(survey.id, report.type, "xlsx")}
-                      className="px-3 py-2 bg-primary text-white text-xs font-medium rounded-lg hover:bg-primary/90 transition"
-                    >
-                      XLSX
-                    </a>
-                    <a
-                      href={reportHref(survey.id, report.type, "csv")}
-                      className="px-3 py-2 border border-slate-300 text-slate-700 text-xs font-medium rounded-lg hover:bg-slate-50 transition"
-                    >
-                      CSV
-                    </a>
+          <DecisionReports surveyId={survey.id} />
+
+          <div className="border-t border-slate-200">
+            <div className="border-b border-slate-100 p-5">
+              <h3 className="font-semibold text-slate-900">Additional Downloads</h3>
+              <p className="mt-1 text-sm text-slate-500">
+                Detailed workbooks for participation, comments, completion tracking, and deeper analysis.
+              </p>
+            </div>
+            <div className="divide-y divide-slate-100">
+              {REPORT_DOWNLOADS.filter((report) => !report.featured).map((report) => (
+                <div key={report.type} className="p-5">
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                    <div className="min-w-0">
+                      <h3 className="font-medium text-slate-900">{report.label}</h3>
+                      <p className="text-sm text-slate-500">{report.description}</p>
+                    </div>
+                    <div className="flex shrink-0 flex-wrap gap-2">
+                      <a
+                        href={reportHref(survey.id, report.type, "xlsx")}
+                        className="px-3 py-2 bg-primary text-white text-xs font-medium rounded-lg hover:bg-primary/90 transition"
+                      >
+                        XLSX
+                      </a>
+                      <a
+                        href={reportHref(survey.id, report.type, "csv")}
+                        className="px-3 py-2 border border-slate-300 text-slate-700 text-xs font-medium rounded-lg hover:bg-slate-50 transition"
+                      >
+                        CSV
+                      </a>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </section>
       ))}
