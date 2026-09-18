@@ -619,7 +619,7 @@ function buildManagerScopedReport(context: ReportContext): ReportSheet[] {
   const rows: CellValue[][] = [
     ...summaryRows(context),
     [],
-    ["Manager Email", "Manager Name", "Employees", "Completed", "Incomplete", "Responses", "Participation Rate", "Average Rating", "Suppression"],
+    ["Manager Email", "Manager Name", "Eligible Employees", "Completed", "Incomplete", "Responses", "Participation Rate", "Average Rating", "Suppression"],
   ];
 
   if (managerEmails.length === 0) {
@@ -836,7 +836,7 @@ function breakdownRows(context: ReportContext, groupBy: "department" | "division
   const rows: CellValue[][] = [
     ...summaryRows(context),
     [],
-    ["Group", "Employees", "Completed", "Responses", "Participation Rate", "Average Rating", "Suppression"],
+    ["Group", "Eligible Employees", "Completed", "Responses", "Participation Rate", "Average Rating", "Suppression"],
   ];
 
   for (const group of groupSurveyData(context, groupBy)) {
@@ -893,7 +893,7 @@ function completionGroupRows(context: ReportContext, groupBy: "department" | "di
   const rows: CellValue[][] = [
     ...summaryRows(context),
     [],
-    ["Group", "Employees", "Completed", "Not Completed", "Completion Rate"],
+    ["Group", "Eligible Employees", "Completed", "Not Completed", "Completion Rate"],
   ];
 
   for (const group of groups) {

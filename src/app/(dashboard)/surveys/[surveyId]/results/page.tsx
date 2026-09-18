@@ -381,7 +381,7 @@ export default function SurveyResultsPage({
             <thead className="border-b border-slate-200">
               <tr>
                 <th className="text-left py-2 font-medium text-slate-600">Department</th>
-                <th className="text-left py-2 font-medium text-slate-600">Employees</th>
+                <th className="text-left py-2 font-medium text-slate-600">Eligible Employees</th>
                 <th className="text-left py-2 font-medium text-slate-600">Responses</th>
                 <th className="text-left py-2 font-medium text-slate-600">Participation</th>
                 <th className="text-left py-2 font-medium text-slate-600">Avg Rating (out of 5)</th>
@@ -570,7 +570,7 @@ function BreakdownList({ title, rows }: { title: string; rows: DeptBreakdown[] }
               <div>
                 <p className="font-medium text-slate-900">{row.name}</p>
                 <p className="text-xs text-slate-500">
-                  {row.completions} completions &middot; {row.employeeCount} employees
+                  {row.completions} completions &middot; {row.employeeCount} eligible employees
                 </p>
               </div>
               {row.suppressed ? (

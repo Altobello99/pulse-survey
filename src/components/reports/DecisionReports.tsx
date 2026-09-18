@@ -171,7 +171,7 @@ function DepartmentSiteReport({ surveyId, rows }: { surveyId: string; rows: Depa
     <div>
       <ReportHeading
         title="Department by Site"
-        description="Production totals by site are shown first. Switch to individual departments for combinations such as Inspection at Wolfedale versus Goldthorne."
+        description="Production totals by site use the eligible survey-opening roster. Switch to individual departments for combinations such as Inspection at Wolfedale versus Goldthorne."
         surveyId={surveyId}
         reportType="department-site"
       />
@@ -199,7 +199,7 @@ function DepartmentSiteReport({ surveyId, rows }: { surveyId: string; rows: Depa
             <tr>
               <th className="px-4 py-3 font-medium">Department / Group</th>
               <th className="px-4 py-3 font-medium">Site</th>
-              <th className="px-4 py-3 font-medium">Employees</th>
+              <th className="px-4 py-3 font-medium">Eligible Employees</th>
               <th className="px-4 py-3 font-medium">Completed</th>
               <th className="px-4 py-3 font-medium">Participation</th>
               <th className="px-4 py-3 font-medium">Avg Rating</th>
@@ -250,7 +250,7 @@ function LeaderReport({ surveyId, rows }: { surveyId: string; rows: LeaderRow[] 
     <div>
       <ReportHeading
         title="Breakdown by Leader"
-        description="Direct-report groups follow the Reports To field in BambooHR. Select a leader below to see every scored question for that team."
+        description="Direct-report groups follow the Reports To field in BambooHR and include only the eligible survey-opening roster. Select a leader below to see every scored question for that team."
         surveyId={surveyId}
         reportType="leader-breakdown"
       />
@@ -268,7 +268,7 @@ function LeaderReport({ surveyId, rows }: { surveyId: string; rows: LeaderRow[] 
           <thead className="bg-slate-50 text-left text-slate-600">
             <tr>
               <th className="px-4 py-3 font-medium">Leader</th>
-              <th className="px-4 py-3 font-medium">Employees</th>
+              <th className="px-4 py-3 font-medium">Eligible Employees</th>
               <th className="px-4 py-3 font-medium">Completed</th>
               <th className="px-4 py-3 font-medium">Participation</th>
               <th className="px-4 py-3 font-medium">Responses</th>

@@ -18,6 +18,7 @@ export async function GET() {
     orderBy: { startDate: "desc" },
     select: {
       id: true,
+      title: true,
       startDate: true,
       questions: {
         where: { type: "rating" },
@@ -28,11 +29,36 @@ export async function GET() {
   const surveyEmployeeWhere = latestSurvey
     ? surveyRosterEmployeeWhere(latestSurvey.startDate)
     : departmentedBambooEmployeeWhere;
-  const departmentCounts = await prisma.user.groupBy({
-    by: ["departmentId"],
-    where: surveyEmployeeWhere,
-    _count: { _all: true },
-  });
+  const surveyStartCutoff = latestSurvey ? new Date(latestSurvey.startDate) : null;
+  surveyStartCutoff?.setUTCHours(0, 0, 0, 0);
+  const [departmentCounts, currentActiveEmployees, postLaunchHires, missingHireDates, sync] =
+    await Promise.all([
+      prisma.user.groupBy({
+        by: ["departmentId"],
+        where: surveyEmployeeWhere,
+        _count: { _all: true },
+      }),
+      prisma.user.count({ where: departmentedBambooEmployeeWhere }),
+      surveyStartCutoff
+        ? prisma.user.count({
+            where: {
+              AND: [
+                departmentedBambooEmployeeWhere,
+                { hireDate: { gte: surveyStartCutoff } },
+              ],
+            },
+          })
+        : Promise.resolve(0),
+      latestSurvey
+        ? prisma.user.count({
+            where: { AND: [departmentedBambooEmployeeWhere, { hireDate: null }] },
+          })
+        : Promise.resolve(0),
+      prisma.user.aggregate({
+        where: departmentedBambooEmployeeWhere,
+        _max: { bambooSyncedAt: true },
+      }),
+    ]);
   const employeeCountsByDepartment = new Map(
     departmentCounts.map((department) => [department.departmentId, department._count._all])
   );
@@ -101,7 +127,25 @@ export async function GET() {
     })
   );
 
-  return Response.json({ data });
+  const eligibleEmployees = departmentCounts.reduce(
+    (sum, department) => sum + department._count._all,
+    0
+  );
+
+  return Response.json({
+    data,
+    meta: {
+      surveyId: latestSurvey?.id || null,
+      surveyTitle: latestSurvey?.title || null,
+      surveyStartDate: latestSurvey?.startDate || null,
+      bambooSyncedAt: sync._max.bambooSyncedAt,
+      currentActiveEmployees,
+      eligibleEmployees,
+      excludedEmployees: Math.max(currentActiveEmployees - eligibleEmployees, 0),
+      postLaunchHires,
+      missingHireDates,
+    },
+  });
 }
 
 function ratingOptions(options: string | null) {

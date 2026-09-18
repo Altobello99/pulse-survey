@@ -78,8 +78,21 @@ type DashboardStats = {
   activeSurveys: number;
 };
 
+type RosterMeta = {
+  surveyId: string | null;
+  surveyTitle: string | null;
+  surveyStartDate: string | null;
+  bambooSyncedAt: string | null;
+  currentActiveEmployees: number;
+  eligibleEmployees: number;
+  excludedEmployees: number;
+  postLaunchHires: number;
+  missingHireDates: number;
+};
+
 type ApiResponse<T> = {
   data?: T;
+  meta?: RosterMeta;
   error?: string;
 };
 
@@ -231,6 +244,7 @@ async function fetchData<T>(url: string): Promise<ApiResponse<T>> {
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [rosterMeta, setRosterMeta] = useState<RosterMeta | null>(null);
   const [departments, setDepartments] = useState<DepartmentAnalytics[]>([]);
   const [trends, setTrends] = useState<TrendPoint[]>([]);
   const [participation, setParticipation] = useState<ParticipationPoint[]>([]);
@@ -288,6 +302,7 @@ export default function AdminDashboard() {
       const participationData = part.data || [];
 
       setDepartments(departmentData);
+      setRosterMeta(depts.meta || null);
       setTrends(trendData);
       setParticipation(participationData);
 
@@ -474,6 +489,9 @@ export default function AdminDashboard() {
       label: "Eligible Employees",
       value: stats?.totalEmployees ?? 0,
       color: "text-slate-900",
+      detail: rosterMeta
+        ? `${rosterMeta.currentActiveEmployees} active in BambooHR; ${rosterMeta.excludedEmployees} excluded from this survey's opening roster`
+        : undefined,
     },
     {
       label: "Active Surveys",
@@ -939,7 +957,7 @@ export default function AdminDashboard() {
                         <span className="block">{group.label}</span>
                       )}
                       <span className="mt-1 block text-xs font-normal text-slate-500">
-                        {group.completionCount} out of {group.employeeCount} completed
+                        {group.completionCount} out of {group.employeeCount} eligible completed
                       </span>
                       <span className="mt-0.5 block text-xs font-normal text-slate-500">
                         {group.participationRate}% complete

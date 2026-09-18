@@ -156,7 +156,7 @@ export default function ManagerDashboard() {
         <SummaryMetric
           label="Participation"
           value={`${data.participationRate}%`}
-          detail={`${data.completions}/${data.eligibleEmployees} eligible employees completed`}
+          detail={`${data.completions}/${data.eligibleEmployees} eligible completed; ${Math.max(data.hierarchyEmployees - data.eligibleEmployees, 0)} of ${data.hierarchyEmployees} active reporting-tree employees excluded from the opening roster`}
           color="text-primary"
         />
         <SummaryMetric

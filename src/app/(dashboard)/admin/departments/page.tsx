@@ -21,14 +21,28 @@ interface DeptData {
   ratingScaleMax: number;
 }
 
+interface RosterMeta {
+  surveyStartDate: string | null;
+  bambooSyncedAt: string | null;
+  currentActiveEmployees: number;
+  eligibleEmployees: number;
+  excludedEmployees: number;
+  postLaunchHires: number;
+  missingHireDates: number;
+}
+
 export default function DepartmentsPage() {
   const [departments, setDepartments] = useState<DeptData[]>([]);
+  const [rosterMeta, setRosterMeta] = useState<RosterMeta | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetch("/api/analytics/departments")
       .then((r) => r.json())
-      .then((d) => setDepartments(d.data || []))
+      .then((d) => {
+        setDepartments(d.data || []);
+        setRosterMeta(d.meta || null);
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -52,6 +66,23 @@ export default function DepartmentsPage() {
         </p>
       </div>
 
+      {rosterMeta && (
+        <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+          <strong>Survey-opening roster:</strong> {rosterMeta.eligibleEmployees} eligible employees from {rosterMeta.currentActiveEmployees} currently active department-assigned BambooHR employees.
+          {rosterMeta.postLaunchHires > 0 && (
+            <> {rosterMeta.postLaunchHires} employees hired on or after {rosterMeta.surveyStartDate ? formatRosterDate(rosterMeta.surveyStartDate) : "the survey start date"} are excluded.</>
+          )}
+          {rosterMeta.missingHireDates > 0 && (
+            <> {rosterMeta.missingHireDates} employees without a BambooHR hire date are also excluded.</>
+          )}
+          {rosterMeta.bambooSyncedAt && (
+            <span className="mt-1 block text-xs text-blue-700">
+              BambooHR last refreshed {formatSyncTime(rosterMeta.bambooSyncedAt)}.
+            </span>
+          )}
+        </div>
+      )}
+
       {departments.length > 0 && (
         <div className="bg-white rounded-xl border border-slate-200 p-6">
           <h2 className="text-lg font-semibold text-slate-900 mb-4">Overview</h2>
@@ -74,7 +105,7 @@ export default function DepartmentsPage() {
           <thead className="bg-slate-50 border-b border-slate-200">
             <tr>
               <th className="text-left px-6 py-3 font-medium text-slate-600">Department</th>
-              <th className="text-left px-6 py-3 font-medium text-slate-600">Employees</th>
+              <th className="text-left px-6 py-3 font-medium text-slate-600">Eligible Employees</th>
               <th className="text-left px-6 py-3 font-medium text-slate-600">Participation</th>
               <th className="text-left px-6 py-3 font-medium text-slate-600">Avg Rating (out of 5)</th>
             </tr>
@@ -120,4 +151,23 @@ export default function DepartmentsPage() {
       </div>
     </div>
   );
+}
+
+function formatRosterDate(value: string) {
+  return new Date(value).toLocaleDateString("en-CA", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function formatSyncTime(value: string) {
+  return new Date(value).toLocaleString("en-CA", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZoneName: "short",
+  });
 }
