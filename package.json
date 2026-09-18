@@ -18,7 +18,8 @@
     "survey:update-current": "tsx scripts/update-current-survey-questions.ts",
     "survey:prepare-launch": "tsx scripts/prepare-september-launch.ts",
     "admin:bootstrap": "tsx scripts/bootstrap-admin.ts",
-    "comments:analyze": "tsx scripts/backfill-comment-analysis.ts"
+    "comments:analyze": "tsx scripts/backfill-comment-analysis.ts",
+    "responses:reconcile-demographics": "tsx scripts/reconcile-response-demographics.ts"
   },
   "prisma": {
     "seed": "npx tsx prisma/seed.ts"

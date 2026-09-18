@@ -178,17 +178,20 @@ export async function POST(
   const locationEligibleFromBamboo = employee.location
     ? eligibleLocations.has(employee.location)
     : false;
-  const safeDepartmentId =
-    requestedDepartmentId ||
-    (departmentEligibleFromBamboo
-      ? employee.departmentId
-      : await getAnonymousFallbackDepartmentId());
-  const safeDivision =
-    requestedDivision || (divisionEligibleFromBamboo ? employee.division : null);
-  const safeTeamId =
-    requestedTeamId || (teamEligibleFromBamboo ? employee.teamId : null);
-  const safeLocation =
-    requestedLocation || (locationEligibleFromBamboo ? employee.location : null);
+  // BambooHR is authoritative when it has a value. This keeps anonymous
+  // response demographics aligned with the separate completion headcounts.
+  const safeDepartmentId = departmentEligibleFromBamboo
+    ? employee.departmentId
+    : requestedDepartmentId || (await getAnonymousFallbackDepartmentId());
+  const safeDivision = divisionEligibleFromBamboo
+    ? employee.division
+    : requestedDivision || null;
+  const safeTeamId = teamEligibleFromBamboo
+    ? employee.teamId
+    : requestedTeamId || null;
+  const safeLocation = locationEligibleFromBamboo
+    ? employee.location
+    : requestedLocation || null;
 
   // CONFIDENTIALITY: Round submittedAt to nearest hour so it cannot be
   // correlated with login timestamps or auth logs to identify respondents.
