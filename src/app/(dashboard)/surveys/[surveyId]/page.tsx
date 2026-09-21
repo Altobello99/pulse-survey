@@ -297,7 +297,7 @@ export default function TakeSurveyPage({ params }: { params: Promise<{ surveyId:
                 <li>Each employee can submit only one response.</li>
                 <li>Your answers are stored separately from your sign-in details.</li>
                 <li>Your name, email, Google ID, and employee ID are never shown with your answers.</li>
-                <li>Results are reported only after at least 3 people respond.</li>
+                <li>Results are reported only after at least 3 employees complete the survey.</li>
                 <li>Managers and admins see only trends, percentages, charts, and anonymous comments.</li>
               </ul>
             </div>

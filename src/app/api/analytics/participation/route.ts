@@ -6,7 +6,7 @@ import {
   getScopedResponseWhere,
   surveyHireDateWhere,
 } from "@/lib/access";
-import { ANONYMITY_THRESHOLD } from "@/lib/constants";
+import { isReportableGroup } from "@/lib/constants";
 import { buildDailyParticipation } from "@/lib/participation";
 
 export async function GET() {
@@ -47,7 +47,7 @@ export async function GET() {
         prisma.user.count({ where: employeeWhere }),
       ]);
       const completions = completionRows.length;
-      const hidden = session.user.role !== "admin" && responseCount < ANONYMITY_THRESHOLD;
+      const hidden = !isReportableGroup(completions, responseCount);
 
       return {
         id: s.id,

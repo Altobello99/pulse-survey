@@ -1,4 +1,4 @@
-import { ANONYMITY_THRESHOLD } from "@/lib/constants";
+import { isReportableGroup } from "@/lib/constants";
 import {
   DEPARTMENT_GROUPS,
   departmentBelongsToGroup,
@@ -111,7 +111,7 @@ export function buildDecisionReportData(input: {
         .filter((value): value is number => value !== null)
     );
     const completions = employees.filter((employee) => completionIds.has(employee.id)).length;
-    const suppressed = responses.length < ANONYMITY_THRESHOLD;
+    const suppressed = !isReportableGroup(completions, responses.length);
 
     return {
       employeeCount: employees.length,
@@ -126,15 +126,18 @@ export function buildDecisionReportData(input: {
     };
   };
 
-  const questionAveragesFor = (responses: ReportResponse[]) =>
+  const questionAveragesFor = (
+    responses: ReportResponse[],
+    completionCount: number
+  ) =>
     input.questions
       .filter((question) => question.type === "rating")
-      .map((question) => buildQuestionAverage(question, responses));
+      .map((question) => buildQuestionAverage(question, responses, completionCount));
 
   return {
     departmentSites: buildDepartmentSiteRows(input, metricsFor),
     leaders: buildLeaderRows(input, managerNames, metricsFor, questionAveragesFor),
-    questionAverages: questionAveragesFor(input.responses),
+    questionAverages: questionAveragesFor(input.responses, input.completions.length),
   };
 }
 
@@ -230,7 +233,10 @@ function buildLeaderRows(
     employees: ReportEmployee[],
     responses: ReportResponse[]
   ) => DecisionReportMetrics,
-  questionAveragesFor: (responses: ReportResponse[]) => QuestionAverageReportRow[]
+  questionAveragesFor: (
+    responses: ReportResponse[],
+    completionCount: number
+  ) => QuestionAverageReportRow[]
 ) {
   const groups = new Map<string, ReportEmployee[]>();
   for (const employee of input.employees) {
@@ -246,20 +252,25 @@ function buildLeaderRows(
         (response) => (normalizeEmail(response.managerEmail) || "not-listed") === email
       );
       const emailValue = email === "not-listed" ? null : email;
+      const metrics = metricsFor(employees, responses);
       return {
         id: email,
         name: emailValue
           ? managerNames.get(email) || email
           : "No leader listed in BambooHR",
         email: emailValue,
-        ...metricsFor(employees, responses),
-        questionAverages: questionAveragesFor(responses),
+        ...metrics,
+        questionAverages: questionAveragesFor(responses, metrics.completions),
       };
     })
     .sort((left, right) => left.name.localeCompare(right.name));
 }
 
-function buildQuestionAverage(question: ReportQuestion, responses: ReportResponse[]) {
+function buildQuestionAverage(
+  question: ReportQuestion,
+  responses: ReportResponse[],
+  completionCount: number
+) {
   const scale = ratingOptions(question);
   const ratings = responses.flatMap((response) =>
     response.answers
@@ -267,7 +278,7 @@ function buildQuestionAverage(question: ReportQuestion, responses: ReportRespons
       .map((answer) => answer.ratingValue)
       .filter((value): value is number => value !== null)
   );
-  const suppressed = ratings.length < ANONYMITY_THRESHOLD;
+  const suppressed = !isReportableGroup(completionCount, ratings.length);
   const isEnps = Math.min(...scale) === 0 && Math.max(...scale) === 10;
 
   return {

@@ -372,7 +372,7 @@ function QuestionAverageTable({ rows }: { rows: QuestionAverage[] }) {
               <td className="px-4 py-3 text-slate-600">{row.responses}</td>
               <td className="px-4 py-3 font-semibold text-slate-900">
                 {row.suppressed || row.average === null
-                  ? "Too few responses"
+                  ? "Protected: fewer than 3 completions"
                   : `${row.average.toFixed(1)} / ${row.scaleMax}`}
               </td>
               <td className="px-4 py-3">
@@ -488,7 +488,7 @@ function EmptyTableRow({ columns }: { columns: number }) {
 
 function formatGroupRating(row: ReportMetrics) {
   if (row.suppressed || row.averageRating === null) {
-    return <span className="text-xs italic text-slate-400">Too few responses</span>;
+    return <span className="text-xs italic text-slate-400">Protected: fewer than 3 completions</span>;
   }
   return <span className="font-semibold text-primary">{row.averageRating.toFixed(1)} / 5</span>;
 }

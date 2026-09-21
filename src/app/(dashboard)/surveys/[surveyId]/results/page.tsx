@@ -417,7 +417,7 @@ export default function SurveyResultsPage({
                         {formatRating(dept.avgRating, dept.ratingScaleMax)}
                       </span>
                     ) : (
-                      <span className="text-xs text-slate-400 italic">Too few responses</span>
+                      <span className="text-xs text-slate-400 italic">Protected: fewer than 3 completions</span>
                     )}
                   </td>
                 </tr>
@@ -574,7 +574,7 @@ function BreakdownList({ title, rows }: { title: string; rows: DeptBreakdown[] }
                 </p>
               </div>
               {row.suppressed ? (
-                <span className="text-xs text-slate-400 italic">Too few responses</span>
+                <span className="text-xs text-slate-400 italic">Protected: fewer than 3 completions</span>
               ) : (
                 <span className={`font-semibold ${ratingColor(row.avgRating)}`}>
                   {formatRating(row.avgRating, row.ratingScaleMax)}

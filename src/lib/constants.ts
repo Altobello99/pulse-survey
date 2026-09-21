@@ -7,10 +7,18 @@ export const COLORS = {
   chartPalette: ["#0d9488", "#2563eb", "#8b5cf6", "#ec4899", "#f97316"],
 };
 
-// Minimum responses required before any segmented results are shown.
+// A segmented result needs both enough completed employees and enough
+// attributable anonymous responses before any score can be shown.
 export const ANONYMITY_THRESHOLD = 3;
 
-// Minimum department-level responses before sentiment/themes are shown per department.
+export function isReportableGroup(completionCount: number, responseCount: number) {
+  return (
+    completionCount >= ANONYMITY_THRESHOLD &&
+    responseCount >= ANONYMITY_THRESHOLD
+  );
+}
+
+// Minimum completed, attributable responses before department sentiment is shown.
 export const DEPT_ANONYMITY_THRESHOLD = 3;
 
 // Departments and locations must have at least this many active employees before

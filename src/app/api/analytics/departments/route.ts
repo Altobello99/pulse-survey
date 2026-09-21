@@ -5,7 +5,7 @@ import {
   departmentedBambooEmployeeWhere,
   surveyRosterEmployeeWhere,
 } from "@/lib/access";
-import { ANONYMITY_THRESHOLD } from "@/lib/constants";
+import { isReportableGroup } from "@/lib/constants";
 
 export async function GET() {
   const session = await getServerSession(authOptions);
@@ -94,7 +94,7 @@ export async function GET() {
           })
         : 0;
       const ratingAnswers = latestSurvey &&
-        recentResponses >= ANONYMITY_THRESHOLD &&
+        isReportableGroup(recentCompletions, recentResponses) &&
         standardRatingQuestionIds.length > 0
         ? await prisma.answer.findMany({
             where: {

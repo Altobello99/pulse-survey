@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { ANONYMITY_THRESHOLD } from "@/lib/constants";
+import { isReportableGroup } from "@/lib/constants";
 import { surveyRosterEmployeeWhere } from "@/lib/access";
 
 // Cross-tab analytics: slice survey results by department, tenure bracket, and job level
@@ -30,10 +30,28 @@ export async function GET(req: NextRequest) {
   });
 
   // Get all users for tenure + level data (linked by department/team, not by response)
-  const users = await prisma.user.findMany({
-    where: surveyRosterEmployeeWhere(survey.startDate),
-    select: { departmentId: true, teamId: true, hireDate: true, jobLevel: true },
-  });
+  const [users, completions] = await Promise.all([
+    prisma.user.findMany({
+      where: surveyRosterEmployeeWhere(survey.startDate),
+      select: { departmentId: true, teamId: true, hireDate: true, jobLevel: true },
+    }),
+    prisma.surveyCompletion.findMany({
+      where: { surveyId, user: surveyRosterEmployeeWhere(survey.startDate) },
+      select: { user: { select: { departmentId: true } } },
+    }),
+  ]);
+  const completionCountsByDepartment = new Map<string, number>();
+  for (const completion of completions) {
+    const departmentId = completion.user.departmentId;
+    completionCountsByDepartment.set(
+      departmentId,
+      (completionCountsByDepartment.get(departmentId) || 0) + 1
+    );
+  }
+  const departmentIdsByName = new Map<string, string>();
+  for (const response of responses) {
+    departmentIdsByName.set(response.department.name, response.departmentId);
+  }
 
   // Calculate tenure brackets from user pool
   function tenureBracket(hireDate: Date | null): string {
@@ -57,7 +75,12 @@ export async function GET(req: NextRequest) {
   }
 
   const departmentData = Object.entries(byDepartment)
-    .filter(([, department]) => department.count >= ANONYMITY_THRESHOLD)
+    .filter(([name, department]) =>
+      isReportableGroup(
+        completionCountsByDepartment.get(departmentIdsByName.get(name) || "") || 0,
+        department.count
+      )
+    )
     .map(([name, d]) => ({
       name,
       count: d.count,

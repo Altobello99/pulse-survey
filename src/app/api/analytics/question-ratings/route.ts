@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { surveyRosterEmployeeWhere } from "@/lib/access";
-import { ANONYMITY_THRESHOLD } from "@/lib/constants";
+import { ANONYMITY_THRESHOLD, isReportableGroup } from "@/lib/constants";
 import {
   DEPARTMENT_GROUPS,
   departmentBelongsToGroup,
@@ -212,9 +212,9 @@ export async function GET(request: NextRequest) {
       const employeeCount = groupEmployeeIds.length;
       const completionCount = groupEmployeeIds.filter((userId) => completedUserIds.has(userId)).length;
       const responseCount = groupResponses.length;
-      const status = responseCount === 0
+      const status = responseCount === 0 || completionCount === 0
         ? "no_responses"
-        : responseCount < ANONYMITY_THRESHOLD
+        : !isReportableGroup(completionCount, responseCount)
           ? "suppressed"
           : "available";
 
@@ -251,7 +251,11 @@ export async function GET(request: NextRequest) {
           .filter((value): value is number => value !== null)
       )
     : [];
-  const enpsStatus = metricStatus(Boolean(enpsQuestion), enpsValues.length);
+  const enpsStatus = metricStatus(
+    Boolean(enpsQuestion),
+    completedUserIds.size,
+    enpsValues.length
+  );
   const promoters = enpsValues.filter((value) => value >= 9).length;
   const passives = enpsValues.filter((value) => value >= 7 && value <= 8).length;
   const detractors = enpsValues.filter((value) => value <= 6).length;
@@ -267,7 +271,11 @@ export async function GET(request: NextRequest) {
           .filter((value): value is string => Boolean(value))
       )
     : [];
-  const bestFriendStatus = metricStatus(Boolean(bestFriendQuestion), bestFriendChoices.length);
+  const bestFriendStatus = metricStatus(
+    Boolean(bestFriendQuestion),
+    completedUserIds.size,
+    bestFriendChoices.length
+  );
   const friendYes = bestFriendChoices.filter((value) => value === "yes").length;
   const friendNo = bestFriendChoices.filter((value) => value === "no").length;
   const friendPreferNotToSay = bestFriendChoices.filter(
@@ -338,10 +346,14 @@ export async function GET(request: NextRequest) {
   });
 }
 
-function metricStatus(questionExists: boolean, responseCount: number) {
+function metricStatus(
+  questionExists: boolean,
+  completionCount: number,
+  responseCount: number
+) {
   if (!questionExists) return "not_configured" as const;
-  if (responseCount === 0) return "no_responses" as const;
-  if (responseCount < ANONYMITY_THRESHOLD) return "suppressed" as const;
+  if (completionCount === 0 || responseCount === 0) return "no_responses" as const;
+  if (!isReportableGroup(completionCount, responseCount)) return "suppressed" as const;
   return "available" as const;
 }
 

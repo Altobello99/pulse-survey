@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import type { Session } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { ANONYMITY_THRESHOLD } from "@/lib/constants";
+import { ANONYMITY_THRESHOLD, isReportableGroup } from "@/lib/constants";
 import {
   canViewRawComments,
   canViewResults,
@@ -58,7 +58,7 @@ export async function GET(
   });
 
   const filterOptions = await getFilterOptions(session.user, survey.startDate);
-  const canShowDetailedResults = responses.length >= ANONYMITY_THRESHOLD;
+  const canShowDetailedResults = isReportableGroup(completions, responses.length);
   const standardRatingQuestionIds = survey.questions
     .filter((question) => {
       if (question.type !== "rating") return false;
@@ -85,7 +85,7 @@ export async function GET(
         locationBreakdown: [],
         filterOptions,
         suppressed: true,
-        suppressionMessage: `Results are hidden until at least ${ANONYMITY_THRESHOLD} people in this group respond.`,
+        suppressionMessage: `Results are hidden until at least ${ANONYMITY_THRESHOLD} employees in this group complete the survey.`,
       },
     });
   }
@@ -428,7 +428,7 @@ async function buildBreakdownRow(
     }),
   ]);
 
-  const showMetrics = responseCount >= ANONYMITY_THRESHOLD;
+  const showMetrics = isReportableGroup(completionCount, responseCount);
   const avgRating =
     showMetrics && ratingAnswers.length
       ? Math.round(

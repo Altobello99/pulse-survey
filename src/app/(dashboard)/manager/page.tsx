@@ -149,7 +149,7 @@ export default function ManagerDashboard() {
       </header>
 
       <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
-        Results include your full BambooHR reporting tree. Ratings and comment patterns appear only when at least {data.anonymityThreshold} people respond; individual answers and comments are never shown here.
+        Results include your full BambooHR reporting tree. Ratings and comment patterns appear only when at least {data.anonymityThreshold} employees complete the survey; individual answers and comments are never shown here.
       </div>
 
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Survey summary">
@@ -162,7 +162,7 @@ export default function ManagerDashboard() {
         <SummaryMetric
           label="Average Rating"
           value={formatAverage(data.averageRating, 5)}
-          detail={data.suppressed ? "Protected until 3 responses" : "Standard 1-5 questions"}
+          detail={data.suppressed ? "Protected until 3 completions" : "Standard 1-5 questions"}
           color="text-emerald-600"
         />
         <SummaryMetric
@@ -170,7 +170,7 @@ export default function ManagerDashboard() {
           value={formatSigned(data.enps)}
           detail={
             data.recommendationAverage === null
-              ? data.suppressed ? "Protected until 3 responses" : "No recommendation ratings yet"
+              ? data.suppressed ? "Protected until 3 completions" : "No recommendation ratings yet"
               : `${data.recommendationAverage.toFixed(1)} / 10 average recommendation`
           }
           color="text-blue-600"
@@ -178,7 +178,7 @@ export default function ManagerDashboard() {
         <SummaryMetric
           label="Best Friend at Work"
           value={data.friendYesPercent === null ? "N/A" : `${data.friendYesPercent}%`}
-          detail={data.suppressed ? "Protected until 3 responses" : "Answered Yes"}
+          detail={data.suppressed ? "Protected until 3 completions" : "Answered Yes"}
           color="text-amber-600"
         />
       </section>
@@ -313,7 +313,7 @@ export default function ManagerDashboard() {
                       </td>
                       <td className="px-5 py-3 text-slate-600">{row.responses}</td>
                       <td className="px-5 py-3 font-semibold text-slate-900">
-                        {row.average === null ? "Too few responses" : `${row.average.toFixed(1)} / ${row.scaleMax}`}
+                        {row.average === null ? "Protected: fewer than 3 completions" : `${row.average.toFixed(1)} / ${row.scaleMax}`}
                       </td>
                     </tr>
                   ))}

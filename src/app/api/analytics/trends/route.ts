@@ -1,8 +1,12 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getScopedResponseWhere } from "@/lib/access";
-import { ANONYMITY_THRESHOLD } from "@/lib/constants";
+import {
+  getScopedEmployeeWhere,
+  getScopedResponseWhere,
+  surveyHireDateWhere,
+} from "@/lib/access";
+import { isReportableGroup } from "@/lib/constants";
 
 export async function GET() {
   const session = await getServerSession(authOptions);
@@ -17,10 +21,21 @@ export async function GET() {
 
   const data = [];
   for (const analysis of analyses) {
-    const responseCount = await prisma.surveyResponse.count({
-      where: await getScopedResponseWhere(session.user, analysis.surveyId),
-    });
-    if (session.user.role !== "admin" && responseCount < ANONYMITY_THRESHOLD) continue;
+    const employeeWhere = {
+      AND: [
+        await getScopedEmployeeWhere(session.user),
+        surveyHireDateWhere(analysis.survey.startDate),
+      ],
+    };
+    const [responseCount, completionCount] = await Promise.all([
+      prisma.surveyResponse.count({
+        where: await getScopedResponseWhere(session.user, analysis.surveyId),
+      }),
+      prisma.surveyCompletion.count({
+        where: { surveyId: analysis.surveyId, user: employeeWhere },
+      }),
+    ]);
+    if (!isReportableGroup(completionCount, responseCount)) continue;
 
     data.push({
       surveyTitle: analysis.survey.title,

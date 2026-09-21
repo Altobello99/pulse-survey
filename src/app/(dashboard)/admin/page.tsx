@@ -569,7 +569,7 @@ export default function AdminDashboard() {
               Question Ratings by Department and Location
             </h2>
             <p className="mt-1 text-sm text-slate-500">
-              Every filtered group requires at least {questionRatings?.threshold ?? 3} responses before ratings appear.
+              Every filtered group requires at least {questionRatings?.threshold ?? 3} completed surveys and attributable responses before ratings appear.
             </p>
           </div>
           <label className="block min-w-0 sm:w-72">
@@ -756,7 +756,7 @@ export default function AdminDashboard() {
                 ) : (
                   <p className="mt-5 text-sm font-medium text-slate-500">
                     {questionRatings.metrics.enps.status === "suppressed"
-                      ? `Protected until at least ${questionRatings.threshold} people in this filtered group respond.`
+                      ? `Protected until at least ${questionRatings.threshold} employees in this filtered group complete the survey.`
                       : questionRatings.metrics.enps.status === "no_responses"
                         ? "No responses yet for this filtered group."
                         : "This survey does not include a 0-10 recommendation question."}
@@ -804,7 +804,7 @@ export default function AdminDashboard() {
                 ) : (
                   <p className="mt-5 text-sm font-medium text-slate-500">
                     {questionRatings.metrics.bestFriend.status === "suppressed"
-                      ? `Protected until at least ${questionRatings.threshold} people in this filtered group respond.`
+                      ? `Protected until at least ${questionRatings.threshold} employees in this filtered group complete the survey.`
                       : questionRatings.metrics.bestFriend.status === "no_responses"
                         ? "No responses yet for this filtered group."
                         : "This survey does not include the best-friend-at-work question."}

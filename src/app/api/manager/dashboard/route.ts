@@ -6,7 +6,7 @@ import {
   getManagerScope,
   surveyHireDateWhere,
 } from "@/lib/access";
-import { ANONYMITY_THRESHOLD } from "@/lib/constants";
+import { ANONYMITY_THRESHOLD, isReportableGroup } from "@/lib/constants";
 import { parseCommentThemes } from "@/lib/comment-analysis-types";
 import { buildDailyParticipation } from "@/lib/participation";
 
@@ -68,7 +68,7 @@ export async function GET() {
     }),
   ]);
 
-  const reportable = responses.length >= ANONYMITY_THRESHOLD;
+  const reportable = isReportableGroup(completions.length, responses.length);
   const textAnswerIds = reportable
     ? responses.flatMap((response) =>
         response.answers
@@ -178,7 +178,7 @@ export async function GET() {
       suppressed: !reportable,
       suppressionMessage: reportable
         ? null
-        : `Team results appear after at least ${ANONYMITY_THRESHOLD} people respond.`,
+        : `Team results appear after at least ${ANONYMITY_THRESHOLD} employees complete the survey.`,
       averageRating: reportable ? average(standardRatings) : null,
       recommendationAverage: recommendationRatings.length
         ? average(recommendationRatings)

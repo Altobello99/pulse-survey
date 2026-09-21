@@ -2,7 +2,8 @@ import { after, NextRequest } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { ANONYMITY_THRESHOLD } from "@/lib/constants";
+import { isReportableGroup } from "@/lib/constants";
+import { surveyRosterEmployeeWhere } from "@/lib/access";
 import {
   analyzeStandaloneFeedback,
 } from "@/lib/comment-analysis";
@@ -106,16 +107,35 @@ async function getSurveyComments(surveyId: string | null, limit: number) {
     select: {
       id: true,
       title: true,
+      startDate: true,
       _count: { select: { responses: true } },
     },
   });
+  const completionCounts = new Map(
+    await Promise.all(
+      surveys.map(async (survey) => [
+        survey.id,
+        await prisma.surveyCompletion.count({
+          where: {
+            surveyId: survey.id,
+            user: surveyRosterEmployeeWhere(survey.startDate),
+          },
+        }),
+      ] as const)
+    )
+  );
   const eligibleSurveyIds = surveys
-    .filter((survey) => survey._count.responses >= ANONYMITY_THRESHOLD)
+    .filter((survey) =>
+      isReportableGroup(
+        completionCounts.get(survey.id) || 0,
+        survey._count.responses
+      )
+    )
     .map((survey) => survey.id);
 
   if (eligibleSurveyIds.length === 0) return [];
 
-  const [answers, departmentResponseCounts] = await Promise.all([
+  const [answers, departmentResponseCounts, completionRowsBySurvey] = await Promise.all([
     prisma.answer.findMany({
       where: {
         textValue: { not: null },
@@ -151,10 +171,41 @@ async function getSurveyComments(surveyId: string | null, limit: number) {
       where: { surveyId: { in: eligibleSurveyIds } },
       _count: { _all: true },
     }),
+    Promise.all(
+      surveys
+        .filter((survey) => eligibleSurveyIds.includes(survey.id))
+        .map(async (survey) => {
+          const completions = await prisma.surveyCompletion.findMany({
+            where: {
+              surveyId: survey.id,
+              user: surveyRosterEmployeeWhere(survey.startDate),
+            },
+            select: { user: { select: { departmentId: true } } },
+          });
+          return completions.map((completion) => ({
+            surveyId: survey.id,
+            departmentId: completion.user.departmentId,
+          }));
+        })
+    ),
   ]);
+  const departmentCompletionCounts = new Map<string, number>();
+  for (const completion of completionRowsBySurvey.flat()) {
+    const key = `${completion.surveyId}:${completion.departmentId}`;
+    departmentCompletionCounts.set(
+      key,
+      (departmentCompletionCounts.get(key) || 0) + 1
+    );
+  }
   const reportableDepartments = new Set(
     departmentResponseCounts
-      .filter((group) => group._count._all >= ANONYMITY_THRESHOLD)
+      .filter((group) => {
+        const key = `${group.surveyId}:${group.departmentId}`;
+        return isReportableGroup(
+          departmentCompletionCounts.get(key) || 0,
+          group._count._all
+        );
+      })
       .map((group) => `${group.surveyId}:${group.departmentId}`)
   );
 
