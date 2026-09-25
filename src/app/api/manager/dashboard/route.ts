@@ -24,17 +24,26 @@ export async function GET() {
   if (!survey) return Response.json({ data: null });
 
   const scope = await getManagerScope(session.user);
+  const scopedEmployeeWhere = scope.companyWide
+    ? departmentedBambooEmployeeWhere
+    : {
+        AND: [
+          departmentedBambooEmployeeWhere,
+          { id: { in: scope.employeeIds } },
+        ],
+      };
   const employeeWhere = {
     AND: [
-      departmentedBambooEmployeeWhere,
-      { id: { in: scope.employeeIds } },
+      scopedEmployeeWhere,
       surveyHireDateWhere(survey.startDate),
     ],
   };
-  const responseWhere = {
-    surveyId: survey.id,
-    managerEmail: { in: scope.managerEmails },
-  };
+  const responseWhere = scope.companyWide
+    ? { surveyId: survey.id }
+    : {
+        surveyId: survey.id,
+        managerEmail: { in: scope.managerEmails },
+      };
 
   const [eligibleEmployees, completions, responses, actionCounts] = await Promise.all([
     prisma.user.findMany({
@@ -162,6 +171,8 @@ export async function GET() {
         startDate: survey.startDate,
         endDate: survey.endDate,
       },
+      scopeType: scope.companyWide ? "company" : "reporting_tree",
+      scopeEmployees: scope.employeeIds.length,
       hierarchyEmployees: scope.employeeIds.length,
       eligibleEmployees: totalEmployees,
       completions: completed,

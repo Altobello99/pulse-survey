@@ -49,6 +49,8 @@ type DashboardData = {
     startDate: string;
     endDate: string;
   };
+  scopeType: "company" | "reporting_tree";
+  scopeEmployees: number;
   hierarchyEmployees: number;
   eligibleEmployees: number;
   completions: number;
@@ -131,6 +133,12 @@ export default function ManagerDashboard() {
     );
   }
 
+  const companyWide = data.scopeType === "company";
+  const excludedFromOpeningRoster = Math.max(
+    data.scopeEmployees - data.eligibleEmployees,
+    0
+  );
+
   return (
     <div className="space-y-6">
       <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -149,14 +157,17 @@ export default function ManagerDashboard() {
       </header>
 
       <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
-        Results include your full BambooHR reporting tree. Ratings and comment patterns appear only when at least {data.anonymityThreshold} employees complete the survey; individual answers and comments are never shown here.
+        {companyWide
+          ? "Results include the full company-wide BambooHR roster."
+          : "Results include your full BambooHR reporting tree."}{" "}
+        Ratings and comment patterns appear only when at least {data.anonymityThreshold} employees complete the survey; individual answers and comments are never shown here.
       </div>
 
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Survey summary">
         <SummaryMetric
-          label="Participation"
+          label={companyWide ? "Company Participation" : "Reporting Tree Participation"}
           value={`${data.participationRate}%`}
-          detail={`${data.completions}/${data.eligibleEmployees} eligible completed; ${Math.max(data.hierarchyEmployees - data.eligibleEmployees, 0)} of ${data.hierarchyEmployees} active reporting-tree employees excluded from the opening roster`}
+          detail={`${data.completions}/${data.eligibleEmployees} eligible completed; ${excludedFromOpeningRoster} of ${data.scopeEmployees} current active employees excluded from the opening roster`}
           color="text-primary"
         />
         <SummaryMetric
@@ -186,7 +197,9 @@ export default function ManagerDashboard() {
       <section className="rounded-lg border border-slate-200 bg-white p-5">
         <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h2 className="text-lg font-semibold text-slate-900">Participation Trend</h2>
+            <h2 className="text-lg font-semibold text-slate-900">
+              {companyWide ? "Company Participation Trend" : "Reporting Tree Participation Trend"}
+            </h2>
             <p className="mt-1 text-sm text-slate-500">Cumulative completion through each survey day.</p>
           </div>
           <p className="text-sm font-medium text-slate-700">

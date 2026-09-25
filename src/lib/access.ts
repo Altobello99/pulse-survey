@@ -78,6 +78,7 @@ export function canViewRawComments(user: SessionUser) {
 export async function getManagerScope(user: SessionUser) {
   if (user.role === "admin") {
     return {
+      companyWide: true,
       employeeIds: [] as string[],
       employeeEmails: [] as string[],
       managerEmails: [] as string[],
@@ -93,6 +94,7 @@ export async function getManagerScope(user: SessionUser) {
     select: {
       id: true,
       email: true,
+      jobTitle: true,
       managerEmail: true,
       departmentId: true,
       division: true,
@@ -102,6 +104,37 @@ export async function getManagerScope(user: SessionUser) {
   });
 
   const currentEmail = normalizeEmail(user.email);
+  const currentUser = allActiveUsers.find(
+    (employee) => normalizeEmail(employee.email) === currentEmail
+  );
+  const companyWide = isCompanyWideExecutive(currentUser?.jobTitle);
+
+  if (companyWide) {
+    const employeeEmails = allActiveUsers.map((employee) => normalizeEmail(employee.email));
+    return {
+      companyWide: true,
+      employeeIds: allActiveUsers.map((employee) => employee.id),
+      employeeEmails,
+      managerEmails: unique([currentEmail, ...employeeEmails]),
+      departmentIds: unique(allActiveUsers.map((employee) => employee.departmentId)),
+      divisions: unique(
+        allActiveUsers
+          .map((employee) => employee.division)
+          .filter((division): division is string => Boolean(division))
+      ),
+      teamIds: unique(
+        allActiveUsers
+          .map((employee) => employee.teamId)
+          .filter((id): id is string => Boolean(id))
+      ),
+      locations: unique(
+        allActiveUsers
+          .map((employee) => employee.location)
+          .filter((location): location is string => Boolean(location))
+      ),
+    };
+  }
+
   const directReportsByManager = new Map<string, typeof allActiveUsers>();
 
   for (const employee of allActiveUsers) {
@@ -131,6 +164,7 @@ export async function getManagerScope(user: SessionUser) {
   });
 
   return {
+    companyWide: false,
     employeeIds: scopedEmployees.map((employee) => employee.id),
     employeeEmails: scopedEmails,
     managerEmails: scopedManagerEmails,
@@ -145,6 +179,7 @@ export async function getScopedEmployeeWhere(user: SessionUser): Promise<Prisma.
   if (user.role === "admin") return departmentedBambooEmployeeWhere;
   if (user.role === "manager") {
     const scope = await getManagerScope(user);
+    if (scope.companyWide) return departmentedBambooEmployeeWhere;
     return scope.employeeIds.length
       ? { AND: [departmentedBambooEmployeeWhere, { id: { in: scope.employeeIds } }] }
       : { id: "__none__" };
@@ -168,6 +203,7 @@ export async function getScopedResponseWhere(
   }
 
   const scope = await getManagerScope(user);
+  if (scope.companyWide) return applyFilters(base, filters);
   if (scope.managerEmails.length === 0) return { surveyId, id: "__none__" };
 
   // Responses store only the respondent's BambooHR manager email. Including
@@ -177,6 +213,11 @@ export async function getScopedResponseWhere(
     { AND: [base, { managerEmail: { in: scope.managerEmails } }] },
     filters
   );
+}
+
+function isCompanyWideExecutive(jobTitle: string | null | undefined) {
+  const normalizedTitle = (jobTitle || "").trim().toLowerCase();
+  return normalizedTitle === "ceo" || normalizedTitle === "chief executive officer";
 }
 
 function applyFilters(where: Prisma.SurveyResponseWhereInput, filters: AccessFilters) {
