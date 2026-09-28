@@ -77,7 +77,7 @@ export async function GET() {
     }),
   ]);
 
-  const reportable = isReportableGroup(completions.length, responses.length);
+  const reportable = isReportableGroup(completions.length);
   const textAnswerIds = reportable
     ? responses.flatMap((response) =>
         response.answers
@@ -107,7 +107,7 @@ export async function GET() {
             section: question.section,
             question: question.text,
             responses: ratings.length,
-            average: ratings.length >= ANONYMITY_THRESHOLD ? average(ratings) : null,
+            average: ratings.length ? average(ratings) : null,
             scaleMin: Math.min(...scale),
             scaleMax: Math.max(...scale),
           };

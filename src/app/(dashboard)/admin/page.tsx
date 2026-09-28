@@ -569,7 +569,7 @@ export default function AdminDashboard() {
               Question Ratings by Department and Location
             </h2>
             <p className="mt-1 text-sm text-slate-500">
-              Every filtered group requires at least {questionRatings?.threshold ?? 3} completed surveys and attributable responses before ratings appear.
+              Every filtered group requires at least {questionRatings?.threshold ?? 3} completed surveys before ratings appear.
             </p>
           </div>
           <label className="block min-w-0 sm:w-72">

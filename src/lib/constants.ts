@@ -7,15 +7,11 @@ export const COLORS = {
   chartPalette: ["#0d9488", "#2563eb", "#8b5cf6", "#ec4899", "#f97316"],
 };
 
-// A segmented result needs both enough completed employees and enough
-// attributable anonymous responses before any score can be shown.
+// Completion tracking is the shared threshold for every segmented result.
 export const ANONYMITY_THRESHOLD = 3;
 
-export function isReportableGroup(completionCount: number, responseCount: number) {
-  return (
-    completionCount >= ANONYMITY_THRESHOLD &&
-    responseCount >= ANONYMITY_THRESHOLD
-  );
+export function isReportableGroup(completionCount: number) {
+  return completionCount >= ANONYMITY_THRESHOLD;
 }
 
 // Minimum completed, attributable responses before department sentiment is shown.

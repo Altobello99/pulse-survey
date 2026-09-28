@@ -314,7 +314,7 @@ function buildDepartmentSiteReport(context: ReportContext): ReportSheet[] {
         `${row.participationRate}%`,
         row.suppressed ? "Suppressed" : row.averageRating,
         "Out of 5",
-        row.suppressed ? `Fewer than ${ANONYMITY_THRESHOLD} completed surveys or attributable responses` : "",
+        row.suppressed ? `Fewer than ${ANONYMITY_THRESHOLD} completed surveys` : "",
       ]);
     }
     return rows;
@@ -381,7 +381,7 @@ function buildLeaderBreakdownReport(context: ReportContext): ReportSheet[] {
       `${leader.participationRate}%`,
       leader.suppressed ? "Suppressed" : leader.averageRating,
       "Out of 5",
-      leader.suppressed ? `Fewer than ${ANONYMITY_THRESHOLD} completed surveys or attributable responses` : "",
+      leader.suppressed ? `Fewer than ${ANONYMITY_THRESHOLD} completed surveys` : "",
     ]);
 
     for (const question of leader.questionAverages) {
@@ -395,7 +395,7 @@ function buildLeaderBreakdownReport(context: ReportContext): ReportSheet[] {
         question.suppressed ? "Suppressed" : question.average,
         `${question.scaleMin}-${question.scaleMax}`,
         question.isEnps && !question.suppressed ? question.enpsScore : "",
-        question.suppressed ? `Fewer than ${ANONYMITY_THRESHOLD} completed surveys or attributable responses` : "",
+        question.suppressed ? `Fewer than ${ANONYMITY_THRESHOLD} completed surveys` : "",
       ]);
     }
   }
@@ -442,7 +442,7 @@ function buildCompanyQuestionAveragesReport(context: ReportContext): ReportSheet
       question.scaleMin,
       question.scaleMax,
       question.isEnps && !question.suppressed ? question.enpsScore : "",
-      question.suppressed ? `Fewer than ${ANONYMITY_THRESHOLD} completed surveys or attributable responses` : "",
+      question.suppressed ? `Fewer than ${ANONYMITY_THRESHOLD} completed surveys` : "",
     ]);
   }
 
@@ -475,7 +475,7 @@ function getDecisionReportData(context: ReportContext) {
 function buildExecutiveSummary(context: ReportContext): ReportSheet[] {
   const metrics = getOverallMetrics(context);
   const reportable = hasReportableResults(context);
-  const suppression = `Suppressed until at least ${ANONYMITY_THRESHOLD} completed surveys and attributable responses`;
+  const suppression = `Suppressed until at least ${ANONYMITY_THRESHOLD} completed surveys`;
   const rows = [
     ...summaryRows(context),
     [],
@@ -634,7 +634,7 @@ function buildManagerScopedReport(context: ReportContext): ReportSheet[] {
     );
     const responses = context.responses.filter((response) => normalizeEmail(response.managerEmail) === managerEmail);
     const ratings = ratingValues(context, responses);
-    const suppressed = !isReportableGroup(completions.length, responses.length);
+    const suppressed = !isReportableGroup(completions.length);
     rows.push([
       managerEmail,
       manager?.name || "",
@@ -644,7 +644,7 @@ function buildManagerScopedReport(context: ReportContext): ReportSheet[] {
       suppressed ? `Suppressed (<${ANONYMITY_THRESHOLD})` : responses.length,
       suppressed || employees.length === 0 ? "Suppressed" : `${Math.round((completions.length / employees.length) * 100)}%`,
       suppressed ? "Suppressed" : average(ratings),
-      suppressed ? `Fewer than ${ANONYMITY_THRESHOLD} completed surveys or attributable responses` : "",
+      suppressed ? `Fewer than ${ANONYMITY_THRESHOLD} completed surveys` : "",
     ]);
   }
 
@@ -730,13 +730,6 @@ function buildCommentsThemesReport(context: ReportContext): ReportSheet[] {
   const analysisByAnswerId = new Map(
     context.commentAnalyses.map((analysis) => [analysis.sourceId, analysis])
   );
-  const responseCountByDepartment = new Map<string, number>();
-  for (const response of context.responses) {
-    responseCountByDepartment.set(
-      response.departmentId,
-      (responseCountByDepartment.get(response.departmentId) || 0) + 1
-    );
-  }
   const completedUserIds = new Set(
     context.completions.map((completion) => completion.userId)
   );
@@ -755,8 +748,7 @@ function buildCommentsThemesReport(context: ReportContext): ReportSheet[] {
         if (!comment) continue;
         const analysis = analysisByAnswerId.get(answer.id);
         const department = isReportableGroup(
-          completionCountByDepartment.get(response.departmentId) || 0,
-          responseCountByDepartment.get(response.departmentId) || 0
+          completionCountByDepartment.get(response.departmentId) || 0
         )
           ? response.department.name
           : "Protected";
@@ -819,7 +811,7 @@ function summaryRows(context: ReportContext): CellValue[][] {
     ["End Date", formatDate(context.survey.endDate)],
     ["Scope", context.scopeLabel],
     ["Generated At", formatDateTime(context.generatedAt)],
-    ["Anonymity Rule", `Survey results and breakdowns require at least ${ANONYMITY_THRESHOLD} completed surveys and attributable responses for every role.`],
+    ["Anonymity Rule", `Survey results and breakdowns require at least ${ANONYMITY_THRESHOLD} completed surveys for every role.`],
   ];
 }
 
@@ -855,8 +847,7 @@ function breakdownRows(context: ReportContext, groupBy: "department" | "division
 
   for (const group of groupSurveyData(context, groupBy)) {
     const suppressed = !isReportableGroup(
-      group.completions.length,
-      group.responses.length
+      group.completions.length
     );
     rows.push([
       group.name,
@@ -865,7 +856,7 @@ function breakdownRows(context: ReportContext, groupBy: "department" | "division
       suppressed ? `Suppressed (<${ANONYMITY_THRESHOLD})` : group.responses.length,
       suppressed || group.employees.length === 0 ? "Suppressed" : `${Math.round((group.completions.length / group.employees.length) * 100)}%`,
       suppressed ? "Suppressed" : average(ratingValues(context, group.responses)),
-      suppressed ? `Fewer than ${ANONYMITY_THRESHOLD} completed surveys or attributable responses` : "",
+      suppressed ? `Fewer than ${ANONYMITY_THRESHOLD} completed surveys` : "",
     ]);
   }
 
@@ -995,7 +986,7 @@ function participationChartData(context: ReportContext): [string, number][] {
   return groupSurveyData(context, "department")
     .filter(
       (group) =>
-        isReportableGroup(group.completions.length, group.responses.length) &&
+        isReportableGroup(group.completions.length) &&
         group.employees.length > 0
     )
     .map((group) => [group.name, Math.round((group.completions.length / group.employees.length) * 100)]);
@@ -1004,7 +995,7 @@ function participationChartData(context: ReportContext): [string, number][] {
 function breakdownChartData(context: ReportContext, groupBy: "department" | "division" | "team" | "location"): [string, number][] {
   return groupSurveyData(context, groupBy)
     .filter((group) =>
-      isReportableGroup(group.completions.length, group.responses.length)
+      isReportableGroup(group.completions.length)
     )
     .map((group) => [group.name, average(ratingValues(context, group.responses))]);
 }
@@ -1158,7 +1149,7 @@ function average(values: number[]) {
 }
 
 function hasReportableResults(context: ReportContext) {
-  return isReportableGroup(context.completions.length, context.responses.length);
+  return isReportableGroup(context.completions.length);
 }
 
 function formatDate(value: Date) {

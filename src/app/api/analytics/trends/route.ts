@@ -3,7 +3,6 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import {
   getScopedEmployeeWhere,
-  getScopedResponseWhere,
   surveyHireDateWhere,
 } from "@/lib/access";
 import { isReportableGroup } from "@/lib/constants";
@@ -27,15 +26,10 @@ export async function GET() {
         surveyHireDateWhere(analysis.survey.startDate),
       ],
     };
-    const [responseCount, completionCount] = await Promise.all([
-      prisma.surveyResponse.count({
-        where: await getScopedResponseWhere(session.user, analysis.surveyId),
-      }),
-      prisma.surveyCompletion.count({
-        where: { surveyId: analysis.surveyId, user: employeeWhere },
-      }),
-    ]);
-    if (!isReportableGroup(completionCount, responseCount)) continue;
+    const completionCount = await prisma.surveyCompletion.count({
+      where: { surveyId: analysis.surveyId, user: employeeWhere },
+    });
+    if (!isReportableGroup(completionCount)) continue;
 
     data.push({
       surveyTitle: analysis.survey.title,

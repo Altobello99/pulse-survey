@@ -88,13 +88,8 @@ export async function GET() {
           })
         : 0;
 
-      const recentResponses = latestSurvey
-        ? await prisma.surveyResponse.count({
-            where: { surveyId: latestSurvey.id, departmentId: dept.id },
-          })
-        : 0;
       const ratingAnswers = latestSurvey &&
-        isReportableGroup(recentCompletions, recentResponses) &&
+        isReportableGroup(recentCompletions) &&
         standardRatingQuestionIds.length > 0
         ? await prisma.answer.findMany({
             where: {

@@ -214,7 +214,7 @@ export async function GET(request: NextRequest) {
       const responseCount = groupResponses.length;
       const status = responseCount === 0 || completionCount === 0
         ? "no_responses"
-        : !isReportableGroup(completionCount, responseCount)
+        : !isReportableGroup(completionCount)
           ? "suppressed"
           : "available";
 
@@ -235,7 +235,7 @@ export async function GET(request: NextRequest) {
 
           return {
             questionId: question.id,
-            average: status === "available" && values.length >= ANONYMITY_THRESHOLD
+            average: status === "available" && values.length
               ? Math.round((values.reduce((sum, value) => sum + value, 0) / values.length) * 10) / 10
               : null,
           };
@@ -353,7 +353,7 @@ function metricStatus(
 ) {
   if (!questionExists) return "not_configured" as const;
   if (completionCount === 0 || responseCount === 0) return "no_responses" as const;
-  if (!isReportableGroup(completionCount, responseCount)) return "suppressed" as const;
+  if (!isReportableGroup(completionCount)) return "suppressed" as const;
   return "available" as const;
 }
 

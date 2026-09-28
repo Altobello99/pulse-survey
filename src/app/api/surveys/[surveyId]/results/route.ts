@@ -58,7 +58,7 @@ export async function GET(
   });
 
   const filterOptions = await getFilterOptions(session.user, survey.startDate);
-  const canShowDetailedResults = isReportableGroup(completions, responses.length);
+  const canShowDetailedResults = isReportableGroup(completions);
   const standardRatingQuestionIds = survey.questions
     .filter((question) => {
       if (question.type !== "rating") return false;
@@ -428,7 +428,7 @@ async function buildBreakdownRow(
     }),
   ]);
 
-  const showMetrics = isReportableGroup(completionCount, responseCount);
+  const showMetrics = isReportableGroup(completionCount);
   const avgRating =
     showMetrics && ratingAnswers.length
       ? Math.round(

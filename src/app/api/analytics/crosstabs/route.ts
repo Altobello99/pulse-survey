@@ -75,10 +75,9 @@ export async function GET(req: NextRequest) {
   }
 
   const departmentData = Object.entries(byDepartment)
-    .filter(([name, department]) =>
+    .filter(([name]) =>
       isReportableGroup(
-        completionCountsByDepartment.get(departmentIdsByName.get(name) || "") || 0,
-        department.count
+        completionCountsByDepartment.get(departmentIdsByName.get(name) || "") || 0
       )
     )
     .map(([name, d]) => ({

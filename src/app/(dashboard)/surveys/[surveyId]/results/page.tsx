@@ -374,7 +374,7 @@ export default function SurveyResultsPage({
         <div className="bg-white rounded-xl border border-slate-200 p-6">
           <h2 className="text-lg font-semibold text-slate-900 mb-4">Department Breakdown</h2>
           <p className="text-xs text-slate-500 mb-4">
-            Aggregated participation and scores per department. Individual responses remain anonymous &mdash; departments with fewer than 3 responses show only participation, not ratings.
+            Aggregated participation and scores per department. Individual responses remain anonymous &mdash; departments with fewer than 3 completions show only participation, not ratings.
           </p>
           <div className="overflow-x-auto">
           <table className="w-full min-w-[720px] text-sm">

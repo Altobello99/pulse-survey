@@ -135,7 +135,7 @@ export function DecisionReports({ surveyId }: { surveyId: string }) {
           <QuestionAverageReport surveyId={surveyId} rows={data.questionAverages} />
         )}
         <p className="mt-4 text-xs text-slate-500">
-          Ratings are hidden for groups with fewer than {data.anonymityThreshold} responses.
+          Ratings are hidden for groups with fewer than {data.anonymityThreshold} completed surveys.
           Participation counts remain available for completion tracking.
         </p>
       </div>

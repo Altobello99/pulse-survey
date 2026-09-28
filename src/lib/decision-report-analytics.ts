@@ -111,7 +111,7 @@ export function buildDecisionReportData(input: {
         .filter((value): value is number => value !== null)
     );
     const completions = employees.filter((employee) => completionIds.has(employee.id)).length;
-    const suppressed = !isReportableGroup(completions, responses.length);
+    const suppressed = !isReportableGroup(completions);
 
     return {
       employeeCount: employees.length,
@@ -278,7 +278,7 @@ function buildQuestionAverage(
       .map((answer) => answer.ratingValue)
       .filter((value): value is number => value !== null)
   );
-  const suppressed = !isReportableGroup(completionCount, ratings.length);
+  const suppressed = !isReportableGroup(completionCount);
   const isEnps = Math.min(...scale) === 0 && Math.max(...scale) === 10;
 
   return {

@@ -127,8 +127,7 @@ async function getSurveyComments(surveyId: string | null, limit: number) {
   const eligibleSurveyIds = surveys
     .filter((survey) =>
       isReportableGroup(
-        completionCounts.get(survey.id) || 0,
-        survey._count.responses
+        completionCounts.get(survey.id) || 0
       )
     )
     .map((survey) => survey.id);
@@ -202,8 +201,7 @@ async function getSurveyComments(surveyId: string | null, limit: number) {
       .filter((group) => {
         const key = `${group.surveyId}:${group.departmentId}`;
         return isReportableGroup(
-          departmentCompletionCounts.get(key) || 0,
-          group._count._all
+          departmentCompletionCounts.get(key) || 0
         );
       })
       .map((group) => `${group.surveyId}:${group.departmentId}`)
