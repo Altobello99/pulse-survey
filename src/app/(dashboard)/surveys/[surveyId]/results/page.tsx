@@ -37,6 +37,7 @@ interface SentimentData {
   themes: string;
   insights: string;
   summary: string;
+  analyzedComments?: number;
 }
 
 interface DeptBreakdown {
@@ -331,9 +332,23 @@ export default function SurveyResultsPage({
           <p className="mt-2 text-sm text-slate-500">Standard 1-5 questions</p>
         </div>
         <div className="bg-white rounded-xl border border-slate-200 p-6">
-          <p className="text-sm text-slate-500 mb-1">Overall Sentiment</p>
-          <p className="text-3xl font-bold capitalize" style={{ color: SENTIMENT_COLORS[(sentiment?.sentiment || "neutral") as keyof typeof SENTIMENT_COLORS] }}>
-            {sentiment?.sentiment || "Pending"}
+          <p className="text-sm text-slate-500 mb-1">Overall Comment Sentiment</p>
+          <p
+            className="text-3xl font-bold capitalize"
+            style={{
+              color: sentiment
+                ? SENTIMENT_COLORS[sentiment.sentiment as keyof typeof SENTIMENT_COLORS]
+                : "#64748b",
+            }}
+          >
+            {sentiment?.sentiment || "No data"}
+          </p>
+          <p className="mt-2 text-sm text-slate-500">
+            {sentiment?.analyzedComments
+              ? `${sentiment.analyzedComments} anonymous comments analyzed`
+              : sentiment
+                ? "Survey-level analysis"
+                : "No written comments have been analyzed"}
           </p>
         </div>
       </div>

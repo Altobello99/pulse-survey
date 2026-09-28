@@ -13,6 +13,7 @@ import {
   type AccessFilters,
 } from "@/lib/access";
 import { groupTeams } from "@/lib/team-groups";
+import { summarizeCommentAnalyses } from "@/lib/survey-sentiment";
 import type { Prisma } from "@/generated/prisma/client";
 
 type FilterOption = {
@@ -163,6 +164,27 @@ export async function GET(
       ) / 10
     : null;
 
+  const freeTextQuestionIds = new Set(
+    survey.questions
+      .filter((question) => question.type === "free_text")
+      .map((question) => question.id)
+  );
+  const commentAnswerIds = responses.flatMap((response) =>
+    response.answers
+      .filter(
+        (answer) =>
+          freeTextQuestionIds.has(answer.questionId) && Boolean(answer.textValue?.trim())
+      )
+      .map((answer) => answer.id)
+  );
+  const commentAnalyses = commentAnswerIds.length
+    ? await prisma.commentAnalysis.findMany({
+        where: { sourceType: "survey", sourceId: { in: commentAnswerIds } },
+        select: { sentiment: true, themes: true },
+      })
+    : [];
+  const commentSentiment = summarizeCommentAnalyses(commentAnalyses);
+
   const departmentBreakdown = await buildDepartmentBreakdown(
     surveyId,
     responseWhere,
@@ -202,7 +224,7 @@ export async function GET(
       completions,
       averageRating,
       ratingScaleMax: 5,
-      sentiment: survey.sentimentAnalyses[0] || null,
+      sentiment: commentSentiment || survey.sentimentAnalyses[0] || null,
       departmentBreakdown,
       divisionBreakdown,
       teamBreakdown,
