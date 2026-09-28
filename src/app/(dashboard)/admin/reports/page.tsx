@@ -32,15 +32,10 @@ export default function AdminReportsPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  const openSurveys = useMemo(() => {
-    const now = new Date();
-    return surveys.filter(
-      (survey) =>
-        survey.status === "active" &&
-        new Date(survey.startDate) <= now &&
-        new Date(survey.endDate) >= now
-    );
-  }, [surveys]);
+  const reportableSurveys = useMemo(
+    () => surveys.filter((survey) => ["active", "closed"].includes(survey.status)),
+    [surveys]
+  );
 
   if (loading) {
     return (
@@ -63,7 +58,7 @@ export default function AdminReportsPage() {
       <div>
         <h1 className="text-2xl font-bold text-slate-900">Reports</h1>
         <p className="text-sm text-slate-500">
-          Admin-only XLSX and CSV downloads for the current open survey.
+          Admin-only XLSX and CSV downloads for active and completed surveys.
         </p>
       </div>
 
@@ -82,11 +77,11 @@ export default function AdminReportsPage() {
         </div>
       )}
 
-      {!error && openSurveys.length === 0 && (
+      {!error && reportableSurveys.length === 0 && (
         <div className="bg-white rounded-xl border border-slate-200 p-10 text-center">
-          <h2 className="text-lg font-semibold text-slate-900">No open survey reports</h2>
+          <h2 className="text-lg font-semibold text-slate-900">No survey reports</h2>
           <p className="mt-1 text-sm text-slate-500">
-            Reports appear here when a survey is active and within its start and end dates.
+            Reports appear here after a survey is opened and remain available when it closes.
           </p>
           <Link
             href="/admin/surveys"
@@ -97,14 +92,14 @@ export default function AdminReportsPage() {
         </div>
       )}
 
-      {openSurveys.map((survey) => (
+      {reportableSurveys.map((survey) => (
         <section key={survey.id} className="bg-white rounded-xl border border-slate-200 overflow-hidden">
           <div className="border-b border-slate-100 p-5 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
               <div className="flex flex-wrap items-center gap-2">
                 <h2 className="text-lg font-semibold text-slate-900">{survey.title}</h2>
-                <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
-                  Open
+                <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${reportStatus(survey).className}`}>
+                  {reportStatus(survey).label}
                 </span>
               </div>
               {survey.description && (
@@ -168,4 +163,15 @@ export default function AdminReportsPage() {
 function reportHref(surveyId: string, reportType: string, format: "xlsx" | "csv") {
   const params = new URLSearchParams({ format, scope: "company" });
   return `/api/surveys/${surveyId}/reports/${reportType}?${params.toString()}`;
+}
+
+function reportStatus(survey: Survey) {
+  const now = Date.now();
+  if (survey.status === "closed" || new Date(survey.endDate).getTime() < now) {
+    return { label: "Closed", className: "bg-slate-100 text-slate-700" };
+  }
+  if (new Date(survey.startDate).getTime() > now) {
+    return { label: "Scheduled", className: "bg-blue-50 text-blue-700" };
+  }
+  return { label: "Open", className: "bg-emerald-50 text-emerald-700" };
 }
