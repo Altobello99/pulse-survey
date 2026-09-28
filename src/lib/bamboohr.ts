@@ -27,6 +27,7 @@ type BambooEmployee = {
   reportsTo?: string | null;
   status?: string | null;
   employmentStatus?: string | null;
+  employmentHistoryStatus?: string | null;
   hireDate?: string | null;
 };
 
@@ -51,6 +52,8 @@ type BambooFieldMetadata = {
 
 export type BambooSyncResult = {
   synced: number;
+  eligible: number;
+  onLeave: number;
   admins: number;
   managers: number;
   deactivated: number;
@@ -78,6 +81,7 @@ const baseFields = [
   "reportsTo",
   "status",
   "employmentStatus",
+  "employmentHistoryStatus",
   "hireDate",
   "employeeNumber",
 ];
@@ -95,13 +99,15 @@ export async function syncBambooEmployees(): Promise<BambooSyncResult> {
   const normalized = employees
     .map((employee) => normalizeEmployee(employee, syncSource.teamFieldKeys))
     .filter((employee): employee is ReturnType<typeof normalizeEmployee> & { email: string } => Boolean(employee.email))
-    .filter((employee) => isActiveBambooEmployee(employee.status, employee.employmentStatus));
+    .filter((employee) => employee.surveyStatus !== "inactive");
 
   if (normalized.length === 0) {
     throw new Error("BambooHR returned no active employees; existing employee data was left unchanged");
   }
 
   const seenEmails = new Set(normalized.map((employee) => employee.email));
+  const eligibleEmployees = normalized.filter((employee) => employee.surveyStatus === "active");
+  const onLeaveEmployees = normalized.filter((employee) => employee.surveyStatus === "on_leave");
   const managerEmails = new Set(
     normalized.map((employee) => employee.managerEmail).filter((email): email is string => Boolean(email))
   );
@@ -150,7 +156,7 @@ export async function syncBambooEmployees(): Promise<BambooSyncResult> {
         managerEmail: employee.managerEmail,
         bambooHrId: employee.bambooHrId,
         employeeNumber: employee.employeeNumber,
-        status: "active",
+        status: employee.surveyStatus,
         location: employee.location,
         division: employee.division,
         bambooSyncedAt: now,
@@ -165,7 +171,7 @@ export async function syncBambooEmployees(): Promise<BambooSyncResult> {
         managerEmail: employee.managerEmail,
         bambooHrId: employee.bambooHrId,
         employeeNumber: employee.employeeNumber,
-        status: "active",
+        status: employee.surveyStatus,
         location: employee.location,
         division: employee.division,
         bambooSyncedAt: now,
@@ -192,13 +198,15 @@ export async function syncBambooEmployees(): Promise<BambooSyncResult> {
 
   return {
     synced: normalized.length,
+    eligible: eligibleEmployees.length,
+    onLeave: onLeaveEmployees.length,
     admins: adminCount,
     managers: managerCount,
     deactivated: deactivated.count,
-    withDepartments: normalized.filter((employee) => employee.department !== "Unassigned").length,
-    withDivisions: normalized.filter((employee) => Boolean(employee.division)).length,
-    withLocations: normalized.filter((employee) => Boolean(employee.location)).length,
-    withTeams: normalized.filter((employee) => Boolean(employee.team)).length,
+    withDepartments: eligibleEmployees.filter((employee) => employee.department !== "Unassigned").length,
+    withDivisions: eligibleEmployees.filter((employee) => Boolean(employee.division)).length,
+    withLocations: eligibleEmployees.filter((employee) => Boolean(employee.location)).length,
+    withTeams: eligibleEmployees.filter((employee) => Boolean(employee.team)).length,
   };
 }
 
@@ -319,6 +327,12 @@ function normalizeEmployee(employee: BambooEmployee, teamFieldKeys: string[]) {
     jobTitle: employee.jobTitle || null,
     status: employee.status || null,
     employmentStatus: employee.employmentStatus || null,
+    employmentHistoryStatus: employee.employmentHistoryStatus || null,
+    surveyStatus: bambooSurveyStatus(
+      employee.status,
+      employee.employmentStatus,
+      employee.employmentHistoryStatus
+    ),
     department: employee.department || "Unassigned",
     division: employee.division || null,
     location: employee.location || null,
@@ -344,16 +358,35 @@ function parseBambooDate(value: string | null | undefined) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
-function isActiveBambooEmployee(
+export function bambooSurveyStatus(
   status: string | null | undefined,
-  employmentStatus: string | null | undefined
-) {
+  employmentStatus: string | null | undefined,
+  employmentHistoryStatus: string | null | undefined
+): "active" | "on_leave" | "inactive" {
   const normalizedStatus = (status || "").trim().toLowerCase();
-  if (normalizedStatus) return normalizedStatus === "active";
+  const normalizedEmploymentStatuses = [employmentStatus, employmentHistoryStatus]
+    .map((value) => (value || "").trim().toLowerCase())
+    .filter(Boolean);
 
-  const normalizedEmploymentStatus = (employmentStatus || "").trim().toLowerCase();
-  if (!normalizedEmploymentStatus) return true;
-  return !["inactive", "terminated", "deceased"].includes(normalizedEmploymentStatus);
+  if (
+    [normalizedStatus, ...normalizedEmploymentStatuses].some((value) =>
+      /\b(on leave|leave of absence|loa|parental leave|maternity leave|paternity leave|medical leave|disability leave)\b/.test(value)
+    )
+  ) {
+    return "on_leave";
+  }
+
+  if (normalizedStatus && normalizedStatus !== "active") return "inactive";
+
+  if (
+    normalizedEmploymentStatuses.some((value) =>
+      ["inactive", "terminated", "deceased"].includes(value)
+    )
+  ) {
+    return "inactive";
+  }
+
+  return "active";
 }
 
 function extractEmail(value: string | null | undefined) {
