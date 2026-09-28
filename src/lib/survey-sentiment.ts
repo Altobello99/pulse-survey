@@ -51,12 +51,7 @@ export function summarizeCommentAnalyses(
     .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
     .slice(0, 6)
     .map(([theme]) => theme);
-  const percentages = Object.fromEntries(
-    COMMENT_SENTIMENTS.map((value) => [
-      value,
-      Math.round((distribution[value] / analyzedComments) * 100),
-    ])
-  ) as Record<CommentSentiment, number>;
+  const percentages = percentageDistribution(distribution, analyzedComments);
 
   const insights = themes.length
     ? [`Most common themes: ${themes.slice(0, 3).join(", ")}.`]
@@ -94,4 +89,33 @@ function overallSentiment(
 function round(value: number, places: number) {
   const multiplier = 10 ** places;
   return Math.round(value * multiplier) / multiplier;
+}
+
+function percentageDistribution(
+  distribution: Record<CommentSentiment, number>,
+  total: number
+) {
+  const percentages = COMMENT_SENTIMENTS.map((sentiment, index) => {
+    const exact = (distribution[sentiment] / total) * 100;
+    return {
+      sentiment,
+      index,
+      value: Math.floor(exact),
+      remainder: exact - Math.floor(exact),
+    };
+  });
+  let pointsRemaining =
+    100 - percentages.reduce((sum, percentage) => sum + percentage.value, 0);
+
+  for (const percentage of [...percentages].sort(
+    (left, right) => right.remainder - left.remainder || left.index - right.index
+  )) {
+    if (pointsRemaining === 0) break;
+    percentage.value += 1;
+    pointsRemaining -= 1;
+  }
+
+  return Object.fromEntries(
+    percentages.map(({ sentiment, value }) => [sentiment, value])
+  ) as Record<CommentSentiment, number>;
 }
