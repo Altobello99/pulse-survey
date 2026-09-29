@@ -68,23 +68,43 @@ export async function GET(
     ? session.user.location
     : null;
 
-  return Response.json({
-    data: {
-      ...survey,
-      completed,
-      eligible,
-      eligibilityMessage: eligible
-        ? null
-        : "This survey is limited to employees who were active before it opened.",
-      demographicOptions: {
-        ...demographicOptions,
-        currentDepartmentId,
-        currentDivision,
-        currentTeamId,
-        currentLocation,
+  const visibleSurvey =
+    session.user.role === "admin"
+      ? survey
+      : {
+          id: survey.id,
+          title: survey.title,
+          description: survey.description,
+          status: survey.status,
+          frequency: survey.frequency,
+          startDate: survey.startDate,
+          endDate: survey.endDate,
+          allowAnonymous: survey.allowAnonymous,
+          createdAt: survey.createdAt,
+          updatedAt: survey.updatedAt,
+          questions: survey.questions,
+        };
+
+  return Response.json(
+    {
+      data: {
+        ...visibleSurvey,
+        completed,
+        eligible,
+        eligibilityMessage: eligible
+          ? null
+          : "This survey is limited to employees who were active before it opened.",
+        demographicOptions: {
+          ...demographicOptions,
+          currentDepartmentId,
+          currentDivision,
+          currentTeamId,
+          currentLocation,
+        },
       },
     },
-  });
+    { headers: { "Cache-Control": "private, no-store, max-age=0" } }
+  );
 }
 
 export async function PUT(

@@ -9,6 +9,7 @@ import {
 import { ANONYMITY_THRESHOLD, isReportableGroup } from "@/lib/constants";
 import { parseCommentThemes } from "@/lib/comment-analysis-types";
 import { buildDailyParticipation } from "@/lib/participation";
+import { getSurveyResultsReleaseAccess } from "@/lib/results-analytics";
 
 export async function GET() {
   const session = await getServerSession(authOptions);
@@ -22,6 +23,14 @@ export async function GET() {
     include: { questions: { orderBy: { order: "asc" } } },
   });
   if (!survey) return Response.json({ data: null });
+
+  const releaseAccess = await getSurveyResultsReleaseAccess(survey.id, session.user);
+  if (!releaseAccess.allowed) {
+    return Response.json(
+      { data: null },
+      { headers: { "Cache-Control": "private, no-store, max-age=0" } }
+    );
+  }
 
   const scope = await getManagerScope(session.user);
   const scopedEmployeeWhere = scope.companyWide
@@ -162,60 +171,63 @@ export async function GET() {
   const totalEmployees = eligibleEmployees.length;
   const completed = completions.length;
 
-  return Response.json({
-    data: {
-      survey: {
-        id: survey.id,
-        title: survey.title,
-        status: survey.status,
-        startDate: survey.startDate,
-        endDate: survey.endDate,
+  return Response.json(
+    {
+      data: {
+        survey: {
+          id: survey.id,
+          title: survey.title,
+          status: survey.status,
+          startDate: survey.startDate,
+          endDate: survey.endDate,
+        },
+        scopeType: scope.companyWide ? "company" : "reporting_tree",
+        scopeEmployees: scope.employeeIds.length,
+        hierarchyEmployees: scope.employeeIds.length,
+        eligibleEmployees: totalEmployees,
+        completions: completed,
+        participationRate: totalEmployees
+          ? Math.round((completed / totalEmployees) * 100)
+          : 0,
+        responseCount: responses.length,
+        dailyParticipation: buildDailyParticipation(
+          completions.map((completion) => completion.completedAt),
+          survey.startDate,
+          survey.endDate,
+          totalEmployees
+        ),
+        suppressed: !reportable,
+        suppressionMessage: reportable
+          ? null
+          : `Team results appear after at least ${ANONYMITY_THRESHOLD} employees complete the survey.`,
+        averageRating: reportable ? average(standardRatings) : null,
+        recommendationAverage: recommendationRatings.length
+          ? average(recommendationRatings)
+          : null,
+        enps: recommendationRatings.length ? calculateEnps(recommendationRatings) : null,
+        friendYesPercent: friendChoices.length
+          ? Math.round(
+              (friendChoices.filter((choice) => choice === "yes").length /
+                friendChoices.length) *
+                100
+            )
+          : null,
+        questionAverages,
+        writtenComments: reportable ? textAnswerIds.length : null,
+        analyzedComments: reportable ? analyses.length : null,
+        sentiment: reportable && commentsReportable ? sentimentCounts : null,
+        themes: reportable && commentsReportable ? themes : [],
+        actions: {
+          open: actions.open || 0,
+          inProgress: actions.in_progress || 0,
+          completed: actions.completed || 0,
+        },
+        anonymityThreshold: ANONYMITY_THRESHOLD,
+        generatedAt: new Date().toISOString(),
       },
-      scopeType: scope.companyWide ? "company" : "reporting_tree",
-      scopeEmployees: scope.employeeIds.length,
-      hierarchyEmployees: scope.employeeIds.length,
-      eligibleEmployees: totalEmployees,
-      completions: completed,
-      participationRate: totalEmployees
-        ? Math.round((completed / totalEmployees) * 100)
-        : 0,
-      responseCount: responses.length,
-      dailyParticipation: buildDailyParticipation(
-        completions.map((completion) => completion.completedAt),
-        survey.startDate,
-        survey.endDate,
-        totalEmployees
-      ),
-      suppressed: !reportable,
-      suppressionMessage: reportable
-        ? null
-        : `Team results appear after at least ${ANONYMITY_THRESHOLD} employees complete the survey.`,
-      averageRating: reportable ? average(standardRatings) : null,
-      recommendationAverage: recommendationRatings.length
-        ? average(recommendationRatings)
-        : null,
-      enps: recommendationRatings.length ? calculateEnps(recommendationRatings) : null,
-      friendYesPercent: friendChoices.length
-        ? Math.round(
-            (friendChoices.filter((choice) => choice === "yes").length /
-              friendChoices.length) *
-              100
-          )
-        : null,
-      questionAverages,
-      writtenComments: reportable ? textAnswerIds.length : null,
-      analyzedComments: reportable ? analyses.length : null,
-      sentiment: reportable && commentsReportable ? sentimentCounts : null,
-      themes: reportable && commentsReportable ? themes : [],
-      actions: {
-        open: actions.open || 0,
-        inProgress: actions.in_progress || 0,
-        completed: actions.completed || 0,
-      },
-      anonymityThreshold: ANONYMITY_THRESHOLD,
-      generatedAt: new Date().toISOString(),
     },
-  });
+    { headers: { "Cache-Control": "private, no-store, max-age=0" } }
+  );
 }
 
 type ScopedResponse = {

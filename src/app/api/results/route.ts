@@ -7,7 +7,10 @@ export async function GET() {
   if (!session) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
   try {
-    return Response.json({ data: await getResultsCatalog(session.user) });
+    return Response.json(
+      { data: await getResultsCatalog(session.user) },
+      { headers: { "Cache-Control": "private, no-store, max-age=0" } }
+    );
   } catch (error) {
     if (error instanceof ResultsAccessError) {
       return Response.json({ error: error.message }, { status: error.status });

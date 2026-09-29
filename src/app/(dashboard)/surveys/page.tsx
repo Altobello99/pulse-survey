@@ -14,6 +14,7 @@ interface Survey {
   endDate: string;
   completed?: boolean;
   eligible?: boolean;
+  resultsAvailable?: boolean;
   _count: { responses: number };
 }
 
@@ -127,8 +128,8 @@ export default function SurveysPage() {
                       </p>
                     )}
                     <p className="text-xs text-slate-400">
-                      {formatDate(survey.startDate)} - {formatDate(survey.endDate)} &middot;{" "}
-                      {survey._count.responses} responses
+                      {formatDate(survey.startDate)} - {formatDate(survey.endDate)}
+                      {isAdminPortal && <> &middot; {survey._count.responses} responses</>}
                     </p>
                   </div>
                   <div className="flex shrink-0 flex-wrap gap-2">
@@ -163,7 +164,7 @@ export default function SurveysPage() {
                         Submitted
                       </span>
                     )}
-                    {canViewResults && (
+                    {canViewResults && survey.resultsAvailable && (
                       <Link
                         href={`/surveys/${survey.id}/results`}
                         className="px-4 py-2 border border-slate-200 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 transition"

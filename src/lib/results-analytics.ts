@@ -65,6 +65,8 @@ type CompletionRow = { userId: string; completedAt: Date };
 
 type MetricSet = ReturnType<typeof buildMetrics>;
 
+export type ResultsReleaseMode = "admin" | "global" | "manager_test" | "locked";
+
 type HierarchyRow = ReturnType<typeof compactMetrics> & {
   id: string;
   type: "department" | "combined";
@@ -107,6 +109,59 @@ export async function getResultsAccessContext(user: SessionUser) {
   };
 }
 
+export async function getSurveyResultsReleaseAccess(
+  surveyId: string,
+  sessionUser: SessionUser
+) {
+  const access = await getResultsAccessContext(sessionUser);
+  if (!access.allowed || !access.user) {
+    return { allowed: false, mode: "locked" as const, testRelease: false };
+  }
+
+  const survey = await prisma.survey.findUnique({
+    where: { id: surveyId },
+    select: {
+      status: true,
+      endDate: true,
+      resultsRelease: {
+        select: {
+          resultsReleasedAt: true,
+          insightsReleasedAt: true,
+          commentsReleasedAt: true,
+        },
+      },
+    },
+  });
+  if (!survey) throw new ResultsAccessError("Survey not found", 404);
+
+  if (access.canManage) {
+    return { allowed: true, mode: "admin" as const, testRelease: false };
+  }
+
+  const leaderEmail = normalizeEmail(access.user.email);
+  const targetedRelease = await prisma.surveyResultsGrant.findUnique({
+    where: { surveyId_leaderEmail: { surveyId, leaderEmail } },
+    select: {
+      resultsReleasedAt: true,
+      insightsReleasedAt: true,
+      commentsReleasedAt: true,
+    },
+  });
+  const surveyClosed = survey.status === "closed" || survey.endDate < new Date();
+  const mode = releaseModeFor(
+    false,
+    surveyClosed,
+    survey.resultsRelease,
+    targetedRelease
+  );
+
+  return {
+    allowed: mode !== "locked",
+    mode,
+    testRelease: mode === "manager_test",
+  };
+}
+
 export async function buildResultsData(
   surveyId: string,
   sessionUser: SessionUser,
@@ -133,14 +188,22 @@ export async function buildResultsData(
         where: { surveyId_leaderEmail: { surveyId, leaderEmail: actorEmail } },
       });
   const viewerRelease = mergeRelease(survey.resultsRelease, actorGrant);
-  const released = Boolean(
-    viewerRelease.resultsReleasedAt &&
-      (survey.status === "closed" || survey.endDate < new Date())
+  const surveyClosed = survey.status === "closed" || survey.endDate < new Date();
+  const releaseMode = releaseModeFor(
+    access.canManage,
+    surveyClosed,
+    survey.resultsRelease,
+    actorGrant
   );
+  const released = releaseMode !== "locked";
   if (!access.canManage && !released) {
     return {
       locked: true,
-      access: serializeAccess(access),
+      access: {
+        ...serializeAccess(access),
+        releaseMode,
+        testRelease: false,
+      },
       survey: serializeSurvey(survey),
       release: serializeRelease(viewerRelease),
       anonymityThreshold: ANONYMITY_THRESHOLD,
@@ -371,6 +434,8 @@ export async function buildResultsData(
     access: {
       ...serializeAccess(access),
       viewingAsLeader: Boolean(viewAsEmail),
+      releaseMode,
+      testRelease: releaseMode === "manager_test",
     },
     survey: serializeSurvey(survey),
     release: serializeRelease(access.canManage ? survey.resultsRelease : viewerRelease),
@@ -428,16 +493,20 @@ export async function getResultsCatalog(sessionUser: SessionUser) {
     where: access.canManage
       ? { status: { in: ["active", "closed"] } }
       : {
-          status: "closed",
-          OR: [
-            { resultsRelease: { resultsReleasedAt: { not: null } } },
+          AND: [
+            { OR: [{ status: "closed" }, { endDate: { lt: new Date() } }] },
             {
-              resultsGrants: {
-                some: {
-                  leaderEmail: actorEmail,
-                  resultsReleasedAt: { not: null },
+              OR: [
+                { resultsRelease: { resultsReleasedAt: { not: null } } },
+                {
+                  resultsGrants: {
+                    some: {
+                      leaderEmail: actorEmail,
+                      resultsReleasedAt: { not: null },
+                    },
+                  },
                 },
-              },
+              ],
             },
           ],
         },
@@ -580,6 +649,19 @@ function mergeRelease(
     commentsReleasedAt:
       globalRelease?.commentsReleasedAt || targetedRelease?.commentsReleasedAt || null,
   };
+}
+
+function releaseModeFor(
+  canManage: boolean,
+  surveyClosed: boolean,
+  globalRelease: { resultsReleasedAt: Date | null } | null,
+  targetedRelease: { resultsReleasedAt: Date | null } | null
+): ResultsReleaseMode {
+  if (canManage) return "admin";
+  if (!surveyClosed) return "locked";
+  if (globalRelease?.resultsReleasedAt) return "global";
+  if (targetedRelease?.resultsReleasedAt) return "manager_test";
+  return "locked";
 }
 
 function normalizeSnapshot(snapshot: Snapshot): Snapshot {

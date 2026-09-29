@@ -116,6 +116,8 @@ type ResultsData = {
     companyWide: boolean;
     executive: boolean;
     viewingAsLeader: boolean;
+    releaseMode: "admin" | "global" | "manager_test" | "locked";
+    testRelease: boolean;
   };
   survey: { id: string; title: string; status: string; startDate: string; endDate: string };
   release: ReleaseState;
@@ -302,8 +304,14 @@ export default function ResultsPage() {
             Explore released pulse survey results by reporting scope, department, and location. Scores are pooled from the underlying responses and protected until at least three employees complete.
           </p>
         </div>
-        {data && !data.locked && (
+        {data && !data.locked && !data.access.testRelease && (
           <ExportMenu surveyId={surveyId} queryString={queryString} disabled={updating} />
+        )}
+        {data && !data.locked && data.access.testRelease && (
+          <div className="flex items-center gap-2 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-900">
+            <ShieldCheck className="h-4 w-4" />
+            Manager test access: downloads disabled
+          </div>
         )}
       </header>
 
@@ -1354,6 +1362,9 @@ function ReleaseCentre({ surveyId, release, targetRelease, targetEmail, targetNa
                 </div>
                 <p className="mt-1 text-sm text-blue-900">
                   Release numerical results, approved insights, and approved comments to {targetName || "the selected manager"} only. This does not publish results to any other leader.
+                </p>
+                <p className="mt-1 text-xs text-blue-800">
+                  Access is limited to their BambooHR reporting hierarchy, the 3-completion privacy rule remains enforced, downloads are disabled, and revocation blocks all current and legacy result views.
                 </p>
               </div>
               <div className="flex shrink-0 items-center gap-3">

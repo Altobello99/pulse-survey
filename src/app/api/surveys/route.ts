@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import {
   departmentedBambooEmployeeWhere,
   isOnSurveyOpeningRoster,
+  normalizeEmail,
   surveyRosterEmployeeWhere,
 } from "@/lib/access";
 import { ensureSurveyRosterSnapshot } from "@/lib/results-roster";
@@ -25,6 +26,11 @@ export async function GET() {
     include: {
       questions: { orderBy: { order: "asc" } },
       _count: { select: { responses: true, completions: true } },
+      resultsRelease: { select: { resultsReleasedAt: true } },
+      resultsGrants: {
+        where: { leaderEmail: normalizeEmail(session.user.email) },
+        select: { resultsReleasedAt: true },
+      },
     },
     orderBy: { createdAt: "desc" },
   });
@@ -48,15 +54,26 @@ export async function GET() {
     where: { AND: [departmentedBambooEmployeeWhere, { id: session.user.id }] },
     select: { hireDate: true },
   });
-  const withEmployeeStatus = surveys.map((survey, index) => ({
-    ...survey,
-    _count: {
-      ...survey._count,
-      completions: eligibleCompletionCounts[index],
-    },
-    completed: completedIds.has(survey.id),
-    eligible: isOnSurveyOpeningRoster(employee?.hireDate, survey.startDate),
-  }));
+  const withEmployeeStatus = surveys.map((survey, index) => {
+    const { resultsRelease, resultsGrants, ...publicSurvey } = survey;
+    const surveyClosed = survey.status === "closed" || survey.endDate < new Date();
+    return {
+      ...publicSurvey,
+      _count: {
+        responses: session.user.role === "admin" ? survey._count.responses : 0,
+        completions:
+          session.user.role === "admin" ? eligibleCompletionCounts[index] : 0,
+      },
+      completed: completedIds.has(survey.id),
+      eligible: isOnSurveyOpeningRoster(employee?.hireDate, survey.startDate),
+      resultsAvailable:
+        session.user.role === "admin" ||
+        (surveyClosed &&
+          Boolean(
+            resultsRelease?.resultsReleasedAt || resultsGrants[0]?.resultsReleasedAt
+          )),
+    };
+  });
 
   // Employees only see surveys that are actively open right now. Historical,
   // draft, and closed surveys are admin/manager-only.
@@ -69,14 +86,16 @@ export async function GET() {
         new Date(s.endDate) >= now
     );
 
-    return Response.json({
-      data: filtered,
-    });
+    return Response.json(
+      { data: filtered },
+      { headers: { "Cache-Control": "private, no-store, max-age=0" } }
+    );
   }
 
-  return Response.json({
-    data: withEmployeeStatus,
-  });
+  return Response.json(
+    { data: withEmployeeStatus },
+    { headers: { "Cache-Control": "private, no-store, max-age=0" } }
+  );
 }
 
 export async function POST(request: NextRequest) {

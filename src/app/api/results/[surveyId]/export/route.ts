@@ -34,6 +34,12 @@ export async function GET(
     if (result.locked || !("metrics" in result)) {
       return Response.json({ error: "Results have not been released." }, { status: 403 });
     }
+    if (result.access.testRelease) {
+      return Response.json(
+        { error: "Downloads are disabled during manager test access. HR can export this report on the manager's behalf." },
+        { status: 403, headers: { "Cache-Control": "private, no-store" } }
+      );
+    }
 
     const data = result as ResultsExportData;
     const file =

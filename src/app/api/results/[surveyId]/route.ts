@@ -17,7 +17,10 @@ export async function GET(
 
   try {
     const filters = parseResultsFilters(request.nextUrl.searchParams);
-    return Response.json({ data: await buildResultsData(surveyId, session.user, filters) });
+    return Response.json(
+      { data: await buildResultsData(surveyId, session.user, filters) },
+      { headers: { "Cache-Control": "private, no-store, max-age=0" } }
+    );
   } catch (error) {
     if (error instanceof ResultsAccessError) {
       return Response.json({ error: error.message }, { status: error.status });

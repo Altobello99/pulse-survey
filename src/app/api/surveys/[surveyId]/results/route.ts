@@ -14,6 +14,7 @@ import {
 } from "@/lib/access";
 import { groupTeams } from "@/lib/team-groups";
 import { summarizeCommentAnalyses } from "@/lib/survey-sentiment";
+import { getSurveyResultsReleaseAccess } from "@/lib/results-analytics";
 import type { Prisma } from "@/generated/prisma/client";
 
 type FilterOption = {
@@ -42,6 +43,14 @@ export async function GET(
   });
   if (!survey) return Response.json({ error: "Not found" }, { status: 404 });
 
+  const releaseAccess = await getSurveyResultsReleaseAccess(surveyId, session.user);
+  if (!releaseAccess.allowed) {
+    return Response.json(
+      { error: "Results have not been released to this reporting group." },
+      { status: 403, headers: { "Cache-Control": "private, no-store" } }
+    );
+  }
+
   const responseWhere = await getScopedResponseWhere(session.user, surveyId, filters);
   const responses = await prisma.surveyResponse.findMany({
     where: responseWhere,
@@ -69,26 +78,29 @@ export async function GET(
     .map((question) => question.id);
 
   if (!canShowDetailedResults) {
-    return Response.json({
-      data: {
-        survey,
-        questionResults: [],
-        participationRate: totalEmployees ? Math.round((completions / totalEmployees) * 100) : 0,
-        totalResponses: responses.length,
-        totalEmployees,
-        completions,
-        averageRating: null,
-        ratingScaleMax: 5,
-        sentiment: null,
-        departmentBreakdown: [],
-        divisionBreakdown: [],
-        teamBreakdown: [],
-        locationBreakdown: [],
-        filterOptions,
-        suppressed: true,
-        suppressionMessage: `Results are hidden until at least ${ANONYMITY_THRESHOLD} employees in this group complete the survey.`,
+    return Response.json(
+      {
+        data: {
+          survey,
+          questionResults: [],
+          participationRate: totalEmployees ? Math.round((completions / totalEmployees) * 100) : 0,
+          totalResponses: responses.length,
+          totalEmployees,
+          completions,
+          averageRating: null,
+          ratingScaleMax: 5,
+          sentiment: null,
+          departmentBreakdown: [],
+          divisionBreakdown: [],
+          teamBreakdown: [],
+          locationBreakdown: [],
+          filterOptions,
+          suppressed: true,
+          suppressionMessage: `Results are hidden until at least ${ANONYMITY_THRESHOLD} employees in this group complete the survey.`,
+        },
       },
-    });
+      { headers: { "Cache-Control": "private, no-store, max-age=0" } }
+    );
   }
 
   const showRawComments = canViewRawComments(session.user);
@@ -210,29 +222,32 @@ export async function GET(
     standardRatingQuestionIds
   );
 
-  return Response.json({
-    data: {
-      survey: {
-        ...survey,
-        allowAnonymous: survey.allowAnonymous,
-        publicToken: survey.publicToken,
+  return Response.json(
+    {
+      data: {
+        survey: {
+          ...survey,
+          allowAnonymous: survey.allowAnonymous,
+          publicToken: survey.publicToken,
+        },
+        questionResults,
+        participationRate: totalEmployees ? Math.round((completions / totalEmployees) * 100) : 0,
+        totalResponses: responses.length,
+        totalEmployees,
+        completions,
+        averageRating,
+        ratingScaleMax: 5,
+        sentiment: commentSentiment || survey.sentimentAnalyses[0] || null,
+        departmentBreakdown,
+        divisionBreakdown,
+        teamBreakdown,
+        locationBreakdown,
+        filterOptions,
+        suppressed: false,
       },
-      questionResults,
-      participationRate: totalEmployees ? Math.round((completions / totalEmployees) * 100) : 0,
-      totalResponses: responses.length,
-      totalEmployees,
-      completions,
-      averageRating,
-      ratingScaleMax: 5,
-      sentiment: commentSentiment || survey.sentimentAnalyses[0] || null,
-      departmentBreakdown,
-      divisionBreakdown,
-      teamBreakdown,
-      locationBreakdown,
-      filterOptions,
-      suppressed: false,
     },
-  });
+    { headers: { "Cache-Control": "private, no-store, max-age=0" } }
+  );
 }
 
 function ratingOptions(question: { options: string | null }) {
