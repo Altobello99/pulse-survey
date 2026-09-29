@@ -3,7 +3,7 @@ export function cn(...classes: (string | undefined | null | false)[]) {
 }
 
 export function formatDate(date: Date | string) {
-  return new Date(date).toLocaleDateString("en-US", {
+  return new Date(date).toLocaleDateString("en-GB", {
     month: "short",
     day: "numeric",
     year: "numeric",
@@ -11,7 +11,7 @@ export function formatDate(date: Date | string) {
 }
 
 export function formatDateShort(date: Date | string) {
-  return new Date(date).toLocaleDateString("en-US", {
+  return new Date(date).toLocaleDateString("en-GB", {
     month: "short",
     day: "numeric",
   });

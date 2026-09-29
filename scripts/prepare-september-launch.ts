@@ -31,6 +31,7 @@ const demoActionTitles = [
   "Research remote collaboration tools",
   "Plan team building activity",
   "Create mentorship program proposal",
+  "Create mentorship programme proposal",
   "Update team documentation",
 ];
 

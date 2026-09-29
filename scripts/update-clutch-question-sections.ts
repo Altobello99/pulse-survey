@@ -25,7 +25,7 @@ const groupedQuestions = [
   },
   {
     section: "Total Rewards & Recognition",
-    text: "Do you feel recognized for your contributions directly to business results?",
+    text: "Do you feel recognised for your contributions directly to business results?",
   },
   {
     section: "Work Safety",

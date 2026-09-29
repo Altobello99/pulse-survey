@@ -24,11 +24,11 @@ export async function analyzeSentiment(
     max_tokens: 1024,
     temperature: 0,
     system:
-      "You are an expert organizational psychologist analyzing employee survey responses. Always respond with valid JSON only, no markdown.",
+      "You are an expert organisational psychologist analysing employee survey responses. Use UK English in all generated text. Always respond with valid JSON only, no markdown.",
     messages: [
       {
         role: "user",
-        content: `Analyze these anonymous employee survey responses and provide:
+        content: `Analyse these anonymous employee survey responses and provide:
 1. Overall sentiment: "positive", "neutral", "negative", or "mixed"
 2. Sentiment score: a number from -1.0 (very negative) to 1.0 (very positive)
 3. Key themes: an array of 3-7 recurring themes

@@ -677,7 +677,7 @@ function surveyPeriod(data: DepartmentWorkbookReportData) {
 }
 
 function formatDate(value: Date) {
-  return new Intl.DateTimeFormat("en-CA", {
+  return new Intl.DateTimeFormat("en-GB", {
     timeZone: "America/Toronto",
     year: "numeric",
     month: "short",
@@ -686,7 +686,7 @@ function formatDate(value: Date) {
 }
 
 function formatDateTime(value: Date) {
-  return new Intl.DateTimeFormat("en-CA", {
+  return new Intl.DateTimeFormat("en-GB", {
     timeZone: "America/Toronto",
     year: "numeric",
     month: "short",

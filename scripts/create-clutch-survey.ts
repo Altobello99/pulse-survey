@@ -36,7 +36,7 @@ const questions: QuestionInput[] = [
   },
   {
     section: "Total Rewards & Recognition",
-    text: "Do you feel recognized for your contributions directly to business results?",
+    text: "Do you feel recognised for your contributions directly to business results?",
     type: "rating",
   },
   {

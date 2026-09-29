@@ -251,6 +251,7 @@ Use critical only for credible language involving immediate physical safety, vio
 Use high for serious non-immediate people, safety, customer, or operational risks requiring prompt review.
 Use medium for meaningful concerns or opportunities that warrant follow-up.
 Use low for routine suggestions, praise, or low-impact observations.
+Use UK English in all generated text.
 Return valid JSON only and classify every supplied id exactly once.`,
     messages: [{
       role: "user",

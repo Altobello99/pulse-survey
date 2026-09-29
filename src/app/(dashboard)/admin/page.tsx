@@ -179,7 +179,7 @@ const ENPS_RANGES = [
   {
     range: "-100 to -1",
     label: "Significant concern",
-    description: "There are more detractors than promoters. Prioritize listening and focused action.",
+    description: "There are more detractors than promoters. Prioritise listening and focused action.",
     color: "border-rose-500",
   },
   {
@@ -884,7 +884,7 @@ export default function AdminDashboard() {
                 <li>Most rating questions use a 1-5 scale. Higher averages indicate a more favourable response.</li>
                 <li>The workplace recommendation question uses a 0-10 scale, so averages above 5 are expected and are displayed as a score out of 10.</li>
                 <li>eNPS subtracts the percentage of Detractors (0-6) from Promoters (9-10). Passives (7-8) do not change the score. The result ranges from -100 to +100.</li>
-                <li>Table colours are normalized to each question&apos;s own scale and are visual guides, not eNPS categories.</li>
+                <li>Table colours are normalised to each question&apos;s own scale and are visual guides, not eNPS categories.</li>
               </ul>
               <p className="mt-2 text-xs text-blue-800">
                 The metric panels use the selected survey, department, and location filters. Small groups remain protected.
@@ -1100,7 +1100,7 @@ export default function AdminDashboard() {
         <div className="flex items-center justify-between mb-4">
           <div>
             <h2 className="text-lg font-semibold text-slate-900">Priority Comments</h2>
-            <p className="mt-1 text-sm text-slate-500">AI-prioritized anonymous survey comments and feedback.</p>
+            <p className="mt-1 text-sm text-slate-500">AI-prioritised anonymous survey comments and feedback.</p>
           </div>
           <Link href="/feedback" className="text-sm text-primary hover:underline">View all</Link>
         </div>

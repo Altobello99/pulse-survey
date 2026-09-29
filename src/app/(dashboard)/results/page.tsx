@@ -512,7 +512,7 @@ function KpiGrid({ data }: { data: ResultsData }) {
       tone: scoreText(data.metrics.averageRating),
     },
     {
-      label: "Favorable",
+      label: "Favourable",
       value: displayPercent(data.metrics.favorablePercent),
       detail: "Ratings of 4 or 5",
       icon: CheckCircle2,
@@ -598,7 +598,7 @@ function BenchmarkStrip({ data }: { data: ResultsData }) {
             <div className="mt-3 grid grid-cols-3 gap-3 text-center">
               <MiniMetric label="Participation" value={`${benchmark.participationRate}%`} />
               <MiniMetric label="Average" value={benchmark.averageRating === null ? "N/A" : `${benchmark.averageRating}/5`} />
-              <MiniMetric label="Favorable" value={displayPercent(benchmark.favorablePercent)} />
+              <MiniMetric label="Favourable" value={displayPercent(benchmark.favorablePercent)} />
             </div>
           </div>
         ))}
@@ -619,7 +619,7 @@ function QuestionSummary({ title, questions, tone }: { title: string; questions:
             </div>
             <div className="min-w-0 p-3">
               <div className="line-clamp-2 text-sm font-semibold text-slate-900">{question.question}</div>
-              <div className="mt-2 text-xs text-slate-500">{question.favorablePercent}% favorable · {question.responses} responses</div>
+              <div className="mt-2 text-xs text-slate-500">{question.favorablePercent}% favourable · {question.responses} responses</div>
             </div>
           </div>
         )) : <ProtectedPanel />}
@@ -683,7 +683,7 @@ function InsightPanel({ data, onRefresh }: { data: ResultsData; onRefresh: () =>
   return (
     <section>
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-        <SectionHeading title="Highlights and areas to watch" detail="AI-assisted synthesis grounded in question scores and analyzed comment themes." />
+        <SectionHeading title="Highlights and areas to watch" detail="AI-assisted synthesis grounded in question scores and analysed comment themes." />
         {data.access.canManage && (
           <button onClick={saveCandidates} disabled={busy || !data.insightCandidates?.length} className="flex h-9 items-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50">
             <RotateCcw className="h-4 w-4" />
@@ -810,7 +810,7 @@ function ComparisonView({ data }: { data: ResultsData }) {
       <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
         <SectionHeading
           title="Side-by-side comparison"
-          detail="Compare authorized reporting organizations, departments, and sites against company-wide results. No leader names or individual responses are shown."
+          detail="Compare authorised reporting organisations, departments, and sites against company-wide results. No leader names or individual responses are shown."
         />
         <div className="flex flex-wrap gap-2">
           <ComparisonSelector
@@ -836,7 +836,7 @@ function ComparisonView({ data }: { data: ResultsData }) {
       <div className="flex items-start gap-3 border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
         <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
         <p>
-          The company-wide comparison uses the complete survey dataset. Every other column is limited to the current viewer&apos;s authorized BambooHR hierarchy and remains protected until at least {data.anonymityThreshold} employees have completed the survey.
+          The company-wide comparison uses the complete survey dataset. Every other column is limited to the current viewer&apos;s authorised BambooHR hierarchy and remains protected until at least {data.anonymityThreshold} employees have completed the survey.
         </p>
       </div>
 
@@ -943,7 +943,7 @@ function ComparisonScoreCell({ group, metric }: { group: ComparisonGroup; metric
             {score.average} <span className="text-xs font-medium text-slate-400">/ {score.scaleMax}</span>
           </div>
           <div className="mt-1 text-xs text-slate-500">
-            {score.isEnps ? "Average recommendation rating" : `${score.favorablePercent ?? 0}% favorable`}
+            {score.isEnps ? "Average recommendation rating" : `${score.favorablePercent ?? 0}% favourable`}
           </div>
           <div className="mt-0.5 text-xs text-slate-400">{score.responses ?? group.completions} responses</div>
         </>
@@ -1042,7 +1042,7 @@ function comparisonScore(group: ComparisonGroup, metric: ComparisonQuestion) {
 function comparisonTypeLabel(type: ComparisonGroup["type"]) {
   if (type === "company") return "Company benchmark";
   if (type === "selected") return "Current view";
-  if (type === "reporting_group") return "Reporting organization";
+  if (type === "reporting_group") return "Reporting organisation";
   if (type === "combined") return "Combined department";
   return "Department by site";
 }
@@ -1064,7 +1064,7 @@ function HierarchyView({ rows }: { rows: HierarchyRow[] }) {
   return (
     <section>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <SectionHeading title="Department by site" detail="Combined Production totals appear first, followed by authorized department and location results." />
+        <SectionHeading title="Department by site" detail="Combined Production totals appear first, followed by authorised department and location results." />
         <div className="flex flex-col gap-2 sm:flex-row">
           <SearchInput value={query} onChange={setQuery} placeholder="Search department or site" />
           <select value={sort} onChange={(event) => setSort(event.target.value as typeof sort)} className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm sm:w-auto">
@@ -1085,7 +1085,7 @@ function HierarchyView({ rows }: { rows: HierarchyRow[] }) {
               <th className="px-4 py-3 font-semibold">Completed surveys</th>
               <th className="px-4 py-3 font-semibold">Participation</th>
               <th className="px-4 py-3 font-semibold">Average (out of 5)</th>
-              <th className="px-4 py-3 font-semibold">Favorable</th>
+              <th className="px-4 py-3 font-semibold">Favourable</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -1119,7 +1119,7 @@ function QuestionsView({ questions, suppressed }: { questions: QuestionResult[];
   return (
     <section>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <SectionHeading title="Question-level scores" detail="Every rating question shows its average, response count, and distribution of favorable responses." />
+        <SectionHeading title="Question-level scores" detail="Every rating question shows its average, response count, and distribution of favourable responses." />
         <div className="flex flex-col gap-2 sm:flex-row">
           <SearchInput value={query} onChange={setQuery} placeholder="Search questions" />
           <select value={sort} onChange={(event) => setSort(event.target.value as typeof sort)} className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm sm:w-auto">
@@ -1154,7 +1154,7 @@ function QuestionsView({ questions, suppressed }: { questions: QuestionResult[];
                 )}
               </div>
               <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
-                {question.isEnps ? <span>Average rating, separate from company-wide eNPS</span> : <><span className="text-emerald-700">{question.favorablePercent}% favorable</span><span>{question.neutralPercent}% neutral</span><span className="text-red-700">{question.unfavorablePercent}% unfavorable</span></>}
+                {question.isEnps ? <span>Average rating, separate from company-wide eNPS</span> : <><span className="text-emerald-700">{question.favorablePercent}% favourable</span><span>{question.neutralPercent}% neutral</span><span className="text-red-700">{question.unfavorablePercent}% unfavourable</span></>}
                 <span className="ml-auto">{question.responses} responses</span>
               </div>
             </article>
@@ -1242,7 +1242,7 @@ function CommentsView({ data, surveyId, onRefresh }: { data: ResultsData; survey
               </div>
             </article>
           ))}
-          {!comments.length && <div className="border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">No authorized comments match these filters.</div>}
+          {!comments.length && <div className="border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">No authorised comments match these filters.</div>}
         </div>
       </section>
     </div>
@@ -1289,7 +1289,7 @@ function ThemePanel({ themes }: { themes: ResultsData["themes"] }) {
             <span className="text-right font-semibold text-slate-700">{theme.mentions}</span>
           </div>
         ))}
-        {!themes.length && <div className="py-5 text-center text-sm text-slate-500">No analyzed themes are available for this view.</div>}
+        {!themes.length && <div className="py-5 text-center text-sm text-slate-500">No analysed themes are available for this view.</div>}
       </div>
     </div>
   );
@@ -1560,11 +1560,11 @@ function labelize(value: string) {
 }
 
 function formatDate(value: string) {
-  return new Intl.DateTimeFormat("en-CA", { month: "short", day: "numeric", year: "numeric", timeZone: "America/Toronto" }).format(new Date(value));
+  return new Intl.DateTimeFormat("en-GB", { month: "short", day: "numeric", year: "numeric", timeZone: "America/Toronto" }).format(new Date(value));
 }
 
 function formatDateTime(value: string) {
-  return new Intl.DateTimeFormat("en-CA", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: "America/Toronto" }).format(new Date(value));
+  return new Intl.DateTimeFormat("en-GB", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: "America/Toronto" }).format(new Date(value));
 }
 
 function commentAccessText(data: ResultsData) {

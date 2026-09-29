@@ -35,7 +35,7 @@ const questions: QuestionInput[] = [
   },
   {
     section: "Total Rewards & Recognition",
-    text: "Do you feel recognized for your contributions directly to business results?",
+    text: "Do you feel recognised for your contributions directly to business results?",
     type: "rating",
   },
   {
@@ -105,6 +105,10 @@ async function main() {
 
   const desiredByText = new Map(questions.map((question) => [question.text, question]));
   const legacyTextByCurrentText = new Map<string, string>([
+    [
+      "Do you feel recognised for your contributions directly to business results?",
+      "Do you feel recognized for your contributions directly to business results?",
+    ],
     [
       "What one thing would help you or your team drive better results?",
       "What one thing would help you or your team drive better results this quarter?",

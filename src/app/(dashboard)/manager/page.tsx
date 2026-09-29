@@ -278,14 +278,14 @@ export default function ManagerDashboard() {
                 <SentimentSummary sentiment={data.sentiment} />
               ) : (
                 <p className="mt-6 text-sm text-slate-500">
-                  Comment patterns will appear after at least {data.anonymityThreshold} comments have been analyzed.
+                  Comment patterns will appear after at least {data.anonymityThreshold} comments have been analysed.
                 </p>
               )}
             </div>
 
             <div className="rounded-lg border border-slate-200 bg-white p-5">
               <h2 className="text-lg font-semibold text-slate-900">Common Themes</h2>
-              <p className="mt-1 text-sm text-slate-500">A theme appears only when it occurs in at least {data.anonymityThreshold} analyzed comments.</p>
+              <p className="mt-1 text-sm text-slate-500">A theme appears only when it occurs in at least {data.anonymityThreshold} analysed comments.</p>
               {data.themes.length > 0 ? (
                 <div className="mt-5 divide-y divide-slate-100">
                   {data.themes.map((theme) => (
@@ -407,7 +407,7 @@ function SentimentSummary({ sentiment }: { sentiment: SentimentCounts }) {
                 <span className="text-xs font-medium text-slate-600">{titleCase(category)}</span>
               </div>
               <p className="mt-1 text-sm font-semibold text-slate-900">{percent}%</p>
-              <p className="text-xs text-slate-500">{sentiment[category]} analyzed</p>
+              <p className="text-xs text-slate-500">{sentiment[category]} analysed</p>
             </div>
           );
         })}

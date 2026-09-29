@@ -62,7 +62,7 @@ export function summarizeCommentAnalyses(
     score,
     themes: JSON.stringify(themes),
     insights: JSON.stringify(insights),
-    summary: `Based on ${analyzedComments} analyzed anonymous comments: ${percentages.positive}% positive, ${percentages.neutral}% neutral, ${percentages.mixed}% mixed, and ${percentages.negative}% negative.`,
+    summary: `Based on ${analyzedComments} analysed anonymous comments: ${percentages.positive}% positive, ${percentages.neutral}% neutral, ${percentages.mixed}% mixed, and ${percentages.negative}% negative.`,
     analyzedComments,
     distribution,
   };

@@ -176,7 +176,7 @@ export default function SurveyResultsPage({
               disabled={analyzing}
               className="px-4 py-2 bg-secondary text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition disabled:opacity-50"
             >
-              {analyzing ? "Analyzing..." : "Run AI Analysis"}
+              {analyzing ? "Analysing..." : "Run AI Analysis"}
             </button>
             <button
               onClick={async () => {
@@ -256,7 +256,7 @@ export default function SurveyResultsPage({
           <div className="mb-4">
             <h2 className="text-lg font-semibold text-slate-900">Report Downloads</h2>
             <p className="text-sm text-slate-500">
-              XLSX files include summary tabs, clean tables, and chart-ready sheets. CSV files include the same report sections as labeled blocks.
+              XLSX files include summary tabs, clean tables, and chart-ready sheets. CSV files include the same report sections as labelled blocks.
             </p>
           </div>
           <div className="divide-y divide-slate-100">
@@ -345,10 +345,10 @@ export default function SurveyResultsPage({
           </p>
           <p className="mt-2 text-sm text-slate-500">
             {sentiment?.analyzedComments
-              ? `${sentiment.analyzedComments} anonymous comments analyzed`
+              ? `${sentiment.analyzedComments} anonymous comments analysed`
               : sentiment
                 ? "Survey-level analysis"
-                : "No written comments have been analyzed"}
+                : "No written comments have been analysed"}
           </p>
         </div>
       </div>

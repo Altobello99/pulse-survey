@@ -154,7 +154,7 @@ export default function DepartmentsPage() {
 }
 
 function formatRosterDate(value: string) {
-  return new Date(value).toLocaleDateString("en-CA", {
+  return new Date(value).toLocaleDateString("en-GB", {
     month: "short",
     day: "numeric",
     year: "numeric",
@@ -162,7 +162,7 @@ function formatRosterDate(value: string) {
 }
 
 function formatSyncTime(value: string) {
-  return new Date(value).toLocaleString("en-CA", {
+  return new Date(value).toLocaleString("en-GB", {
     month: "short",
     day: "numeric",
     year: "numeric",

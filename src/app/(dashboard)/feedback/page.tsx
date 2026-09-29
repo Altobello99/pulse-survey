@@ -565,7 +565,7 @@ function ThemeTable({
   if (!rows.length) {
     return (
       <div className="rounded-xl border border-slate-200 bg-white p-12 text-center text-slate-500">
-        No analyzed themes match these filters.
+        No analysed themes match these filters.
       </div>
     );
   }

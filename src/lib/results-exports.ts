@@ -103,7 +103,7 @@ export async function createResultsWorkbook(data: ResultsExportData) {
   writeTableSheet(
     questions,
     "Question Scores",
-    ["#", "Section", "Question", "Responses", "Average", "Scale", "Favorable"],
+    ["#", "Section", "Question", "Responses", "Average", "Scale", "Favourable"],
     data.questions.map((question) => [
       question.order,
       question.section || "General",
@@ -120,7 +120,7 @@ export async function createResultsWorkbook(data: ResultsExportData) {
   writeTableSheet(
     hierarchy,
     "Department and Location Comparison",
-    ["Team result", "Eligible", "Completed", "Participation", "Average", "Favorable", "Privacy"],
+    ["Team result", "Eligible", "Completed", "Participation", "Average", "Favourable", "Privacy"],
     data.hierarchy.map((row) => [
       row.label,
       row.eligibleEmployees,
@@ -152,7 +152,7 @@ export async function createResultsWorkbook(data: ResultsExportData) {
   const comments = workbook.addSheet("Anonymous Comments");
   writeTableSheet(
     comments,
-    "Authorized Anonymous Comments",
+    "Authorised Anonymous Comments",
     ["Department", "Location", "Sentiment", "Severity", "Themes", "Question", "Comment"],
     data.comments.map((comment) => [
       comment.department,
@@ -181,7 +181,7 @@ export async function createResultsWorkbook(data: ResultsExportData) {
       ["Completed", data.metrics.completions, "", ""],
       ["Participation", `${data.metrics.participationRate}%`, `${data.benchmarks.company.participationRate}%`, data.benchmarks.parent ? `${data.benchmarks.parent.participationRate}%` : "N/A"],
       ["Average rating", displayScore(data.metrics.averageRating), displayScore(data.benchmarks.company.averageRating), data.benchmarks.parent ? displayScore(data.benchmarks.parent.averageRating) : "N/A"],
-      ["Favorable", displayPercent(data.metrics.favorablePercent), displayPercent(data.benchmarks.company.favorablePercent), data.benchmarks.parent ? displayPercent(data.benchmarks.parent.favorablePercent) : "N/A"],
+      ["Favourable", displayPercent(data.metrics.favorablePercent), displayPercent(data.benchmarks.company.favorablePercent), data.benchmarks.parent ? displayPercent(data.benchmarks.parent.favorablePercent) : "N/A"],
       ["Company-wide eNPS", data.metrics.enps ?? "N/A", data.metrics.enps ?? "N/A", "N/A"],
       ["Best friend at work", displayPercent(data.metrics.friendYesPercent), "", ""],
       ["Written comments", data.metrics.commentCount ?? "Protected", "", ""],
@@ -251,7 +251,7 @@ function buildDashboardSheet(sheet: Sheet, data: ResultsExportData) {
   const cards = [
     ["Participation", `${data.metrics.participationRate}%`, `${data.metrics.completions}/${data.metrics.eligibleEmployees} completed`],
     ["Average rating", displayScore(data.metrics.averageRating), "out of 5"],
-    ["Favorable", displayPercent(data.metrics.favorablePercent), "ratings of 4 or 5"],
+    ["Favourable", displayPercent(data.metrics.favorablePercent), "ratings of 4 or 5"],
     ["Company eNPS", data.metrics.enps ?? "N/A", "company-wide benchmark"],
   ];
   cards.forEach((card, index) => {
@@ -293,7 +293,7 @@ function writeQuestionBlocks(
 ) {
   questions.forEach((question, index) => {
     const row = startRow + index * 4;
-    sheet.range(`${col(startColumn)}${row}:${col(endColumn)}${row}`).merged(true).value([[`${question.average} / 5  |  ${question.favorablePercent}% favorable`]]).style({ bold: true, fontColor: colour, fontSize: 13 });
+    sheet.range(`${col(startColumn)}${row}:${col(endColumn)}${row}`).merged(true).value([[`${question.average} / 5  |  ${question.favorablePercent}% favourable`]]).style({ bold: true, fontColor: colour, fontSize: 13 });
     sheet.range(`${col(startColumn)}${row + 1}:${col(endColumn)}${row + 3}`).merged(true).value([[question.question]]).style({ wrapText: true, verticalAlignment: "top", fontColor: COLORS.navy });
   });
 }
@@ -314,7 +314,7 @@ function writeTableSheet(
       sheet.range(`A${row}:${col(headers.length)}${row}`).style({ fill: COLORS.panel });
     }
   } else {
-    sheet.range(`A5:${col(headers.length)}6`).merged(true).value([["No authorized data is available for this view."]]).style({ fontColor: COLORS.muted, italic: true });
+    sheet.range(`A5:${col(headers.length)}6`).merged(true).value([["No authorised data is available for this view."]]).style({ fontColor: COLORS.muted, italic: true });
   }
 }
 
@@ -325,7 +325,7 @@ function addSummarySlide(pptx: PptxGenJS, data: ResultsExportData) {
   const cards = [
     ["Participation", `${data.metrics.participationRate}%`, `${data.metrics.completions} of ${data.metrics.eligibleEmployees} completed`],
     ["Average rating", displayScore(data.metrics.averageRating), "out of 5"],
-    ["Favorable", displayPercent(data.metrics.favorablePercent), "ratings of 4 or 5"],
+    ["Favourable", displayPercent(data.metrics.favorablePercent), "ratings of 4 or 5"],
     ["Company eNPS", String(data.metrics.enps ?? "N/A"), recommendation?.average === null || recommendation?.average === undefined ? "company-wide benchmark" : `${recommendation.average} / 10 average rating`],
   ];
   cards.forEach((card, index) => addPptCard(slide, 0.45 + index * 3.18, 1.65, 2.82, 1.2, card[0], card[1], card[2]));
@@ -339,7 +339,7 @@ function addSummarySlide(pptx: PptxGenJS, data: ResultsExportData) {
 
 function addQuestionSlide(pptx: PptxGenJS, data: ResultsExportData) {
   const slide = pptx.addSlide();
-  addSlideFrame(slide, "Question Scores", "Average score and favorable response rate");
+  addSlideFrame(slide, "Question Scores", "Average score and favourable response rate");
   const questions = data.questions.filter((question) => !question.isEnps).slice(0, 10);
   questions.forEach((question, index) => {
     const column = index < 5 ? 0 : 1;
@@ -351,7 +351,7 @@ function addQuestionSlide(pptx: PptxGenJS, data: ResultsExportData) {
     const width = question.average === null ? 0 : ((question.average || 0) / 5) * 5.72;
     slide.addShape(pptx.ShapeType.rect, { x, y: y + 0.49, w: 5.72, h: 0.12, line: { color: COLORS.line, transparency: 100 }, fill: { color: COLORS.line } });
     if (width) slide.addShape(pptx.ShapeType.rect, { x, y: y + 0.49, w: width, h: 0.12, line: { color: COLORS.teal, transparency: 100 }, fill: { color: COLORS.teal } });
-    slide.addText(question.favorablePercent === null ? "" : `${question.favorablePercent}% favorable`, { x, y: y + 0.66, w: 5.72, h: 0.2, fontSize: 9, color: COLORS.slate, margin: 0 });
+    slide.addText(question.favorablePercent === null ? "" : `${question.favorablePercent}% favourable`, { x, y: y + 0.66, w: 5.72, h: 0.2, fontSize: 9, color: COLORS.slate, margin: 0 });
   });
   const recommendation = data.questions.find((question) => question.isEnps);
   if (recommendation) {
@@ -371,7 +371,7 @@ function addHierarchySlide(pptx: PptxGenJS, data: ResultsExportData) {
     slide.addText(`${row.completions}/${row.eligibleEmployees}`, { x: 5.85, y, w: 1.1, h: 0.24, fontSize: 11, color: COLORS.slate, align: "right", margin: 0 });
     slide.addText(`${row.participationRate}%`, { x: 7.1, y, w: 0.8, h: 0.24, fontSize: 11, color: COLORS.tealDark, bold: true, align: "right", margin: 0 });
     slide.addText(row.averageRating === null ? "Protected" : `${row.averageRating} / 5`, { x: 8.25, y, w: 1.25, h: 0.24, fontSize: 11, color: scoreColour(row.averageRating), bold: true, align: "right", margin: 0 });
-    slide.addText(row.favorablePercent === null ? "" : `${row.favorablePercent}% favorable`, { x: 9.75, y, w: 1.35, h: 0.24, fontSize: 10, color: COLORS.slate, align: "right", margin: 0 });
+    slide.addText(row.favorablePercent === null ? "" : `${row.favorablePercent}% favourable`, { x: 9.75, y, w: 1.35, h: 0.24, fontSize: 10, color: COLORS.slate, align: "right", margin: 0 });
   });
 }
 
@@ -416,7 +416,7 @@ function addCommentSlides(pptx: PptxGenJS, data: ResultsExportData) {
   const priorityComments = data.comments.slice(0, 24);
   for (let offset = 0; offset < priorityComments.length; offset += 4) {
     const slide = pptx.addSlide();
-    addSlideFrame(slide, "Priority Anonymous Comments", `${data.scope.label} | Showing ${offset + 1}-${Math.min(offset + 4, priorityComments.length)} of ${data.comments.length}; full authorized comments are in Excel`);
+    addSlideFrame(slide, "Priority Anonymous Comments", `${data.scope.label} | Showing ${offset + 1}-${Math.min(offset + 4, priorityComments.length)} of ${data.comments.length}; full authorised comments are in Excel`);
     priorityComments.slice(offset, offset + 4).forEach((comment, index) => {
       const y = 1.22 + index * 1.38;
       slide.addShape(pptx.ShapeType.roundRect, { x: 0.55, y, w: 12.2, h: 1.14, rectRadius: 0.03, line: { color: COLORS.line }, fill: { color: COLORS.white } });
@@ -449,7 +449,7 @@ function addQuestionList(slide: PptxGenJS.Slide, x: number, y: number, w: number
     slide.addShape("ellipse", { x: x + 0.16, y: itemY + 0.16, w: 0.42, h: 0.42, line: { color: colour }, fill: { color: colour } });
     slide.addText(String(question.average ?? ""), { x: x + 0.16, y: itemY + 0.25, w: 0.42, h: 0.12, fontSize: 10, bold: true, color: COLORS.white, align: "center", margin: 0 });
     slide.addText(question.question, { x: x + 0.72, y: itemY + 0.11, w: w - 0.9, h: 0.35, fontSize: 11, bold: true, color: COLORS.navy, margin: 0, fit: "shrink" });
-    slide.addText(`${question.favorablePercent ?? 0}% favorable`, { x: x + 0.72, y: itemY + 0.5, w: w - 0.9, h: 0.13, fontSize: 8.5, color: COLORS.slate, margin: 0 });
+    slide.addText(`${question.favorablePercent ?? 0}% favourable`, { x: x + 0.72, y: itemY + 0.5, w: w - 0.9, h: 0.13, fontSize: 8.5, color: COLORS.slate, margin: 0 });
   });
 }
 
@@ -462,7 +462,7 @@ function addPdfSummary(pdf: PDFDocument, data: ResultsExportData, fonts: PdfFont
   const cards = [
     ["Participation", `${data.metrics.participationRate}%`, `${data.metrics.completions}/${data.metrics.eligibleEmployees} completed`],
     ["Average", displayScore(data.metrics.averageRating), "out of 5"],
-    ["Favorable", displayPercent(data.metrics.favorablePercent), "ratings of 4 or 5"],
+    ["Favourable", displayPercent(data.metrics.favorablePercent), "ratings of 4 or 5"],
     ["Company eNPS", String(data.metrics.enps ?? "N/A"), recommendation?.average === null || recommendation?.average === undefined ? "company-wide" : `${recommendation.average}/10 average`],
   ];
   cards.forEach((card, index) => pdfCard(page, fonts, 42 + index * 225, 365, 205, 95, card[0], card[1], card[2]));
@@ -473,7 +473,7 @@ function addPdfSummary(pdf: PDFDocument, data: ResultsExportData, fonts: PdfFont
 
 function addPdfQuestions(pdf: PDFDocument, data: ResultsExportData, fonts: PdfFonts) {
   const page = newPdfPage(pdf);
-  pdfHeader(page, fonts, "Question Scores", "Average score and favorable response rate");
+  pdfHeader(page, fonts, "Question Scores", "Average score and favourable response rate");
   data.questions.filter((question) => !question.isEnps).slice(0, 10).forEach((question, index) => {
     const column = index < 5 ? 0 : 1;
     const row = index % 5;
@@ -599,7 +599,7 @@ function sectionStyle(fill: string) {
 }
 
 function dateRange(survey: ResultsExportData["survey"]) {
-  const formatter = new Intl.DateTimeFormat("en-CA", { month: "short", day: "numeric", year: "numeric", timeZone: "America/Toronto" });
+  const formatter = new Intl.DateTimeFormat("en-GB", { month: "short", day: "numeric", year: "numeric", timeZone: "America/Toronto" });
   return `${formatter.format(new Date(survey.startDate))} to ${formatter.format(new Date(survey.endDate))}`;
 }
 

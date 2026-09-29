@@ -274,7 +274,7 @@ export async function buildResultsData(
   const scope = normalizeScope(requestedScope, access.companyWide && !viewAsEmail);
   const baseRoster = rosterForScope(allRoster, effectiveEmail, scope, leaderEmails);
   if (!access.companyWide && baseRoster.length === 0) {
-    throw new ResultsAccessError("No authorized survey results were found for this reporting group.", 403);
+    throw new ResultsAccessError("No authorised survey results were found for this reporting group.", 403);
   }
 
   const normalizedFilters = normalizeFilters(filters);
@@ -1102,7 +1102,7 @@ function buildReportingGroupComparisons(input: {
         id: `reporting:${createHash("sha256").update(leader.email).digest("hex").slice(0, 12)}`,
         type: "reporting_group",
         label: reportingGroupLabel(roster),
-        detail: "Direct reporting organization",
+        detail: "Direct reporting organisation",
         ...comparisonMetrics(metrics),
       },
     ];
@@ -1301,7 +1301,7 @@ function buildInsightCandidates(input: {
       insightKey: "highest-question",
       kind: "highlight",
       title: "Highest-rated experience",
-      body: `${highest.question} is the highest-rated item for this reporting group at ${highest.average} out of 5 (${highest.favorablePercent}% favorable).`,
+      body: `${highest.question} is the highest-rated item for this reporting group at ${highest.average} out of 5 (${highest.favorablePercent}% favourable).`,
       severity: "positive",
       evidence: JSON.stringify({ questionId: highest.id, average: highest.average }),
       sortOrder: 10,
@@ -1312,7 +1312,7 @@ function buildInsightCandidates(input: {
       insightKey: "lowest-question",
       kind: "watch",
       title: "Primary area to watch",
-      body: `${lowest.question} is the lowest-rated item at ${lowest.average} out of 5 (${lowest.favorablePercent}% favorable).`,
+      body: `${lowest.question} is the lowest-rated item at ${lowest.average} out of 5 (${lowest.favorablePercent}% favourable).`,
       severity: (lowest.average || 0) < 3.5 ? "high" : "medium",
       evidence: JSON.stringify({ questionId: lowest.id, average: lowest.average }),
       sortOrder: 20,
@@ -1395,7 +1395,7 @@ function buildScopeLabel(
   if (parts.length) return `Team Results: ${parts.join(", ")}`;
   if (scope === "leadership") return "Direct leadership team";
   if (scope === "direct") return "Direct reports";
-  return "My organization";
+  return "My organisation";
 }
 
 function hasFilters(filters: ReturnType<typeof normalizeFilters>) {
@@ -1417,7 +1417,7 @@ function scopeOptions(
   );
   return [
     ...(companyWide ? [{ value: "company", label: "Company-wide" }] : []),
-    { value: "organization", label: "My organization" },
+    { value: "organization", label: "My organisation" },
     { value: "direct", label: "Direct reports" },
     ...(hasLeadership
       ? [{ value: "leadership", label: "Direct leadership team" }]

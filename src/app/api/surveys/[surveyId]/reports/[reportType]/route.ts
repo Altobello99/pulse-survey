@@ -487,7 +487,7 @@ function buildExecutiveSummary(context: ReportContext): ReportSheet[] {
     ["Overall average rating", reportable ? metrics.averageRating || "No ratings yet" : suppression],
     ["Open written comments", reportable ? metrics.comments : suppression],
     [],
-    ["AI sentiment", reportable ? context.survey.sentimentAnalyses[0]?.sentiment || "Not analyzed" : suppression],
+    ["AI sentiment", reportable ? context.survey.sentimentAnalyses[0]?.sentiment || "Not analysed" : suppression],
     ["AI summary", reportable ? context.survey.sentimentAnalyses[0]?.summary || "Run AI analysis from the results page." : suppression],
   ];
 
@@ -724,7 +724,7 @@ function buildCommentsThemesReport(context: ReportContext): ReportSheet[] {
       "AI Confidence",
       "AI Triage Rationale",
       "Analysis Engine",
-      "Analyzed At",
+      "Analysed At",
     ],
   ];
   const analysisByAnswerId = new Map(
@@ -1153,7 +1153,7 @@ function hasReportableResults(context: ReportContext) {
 }
 
 function formatDate(value: Date) {
-  return new Intl.DateTimeFormat("en-CA", {
+  return new Intl.DateTimeFormat("en-GB", {
     timeZone: "America/Toronto",
     year: "numeric",
     month: "2-digit",
@@ -1162,7 +1162,7 @@ function formatDate(value: Date) {
 }
 
 function formatDateTime(value: Date) {
-  return new Intl.DateTimeFormat("en-CA", {
+  return new Intl.DateTimeFormat("en-GB", {
     timeZone: "America/Toronto",
     year: "numeric",
     month: "2-digit",

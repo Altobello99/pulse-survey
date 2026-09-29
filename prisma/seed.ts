@@ -83,7 +83,7 @@ async function main() {
       questions: {
         create: [
           { text: "How satisfied are you with your work-life balance?", type: "rating", order: 0 },
-          { text: "I feel valued and recognized for my contributions.", type: "rating", order: 1 },
+          { text: "I feel valued and recognised for my contributions.", type: "rating", order: 1 },
           { text: "How would you rate communication within your team?", type: "rating", order: 2 },
           { text: "What is your preferred way to receive feedback?", type: "multiple_choice", order: 3, options: JSON.stringify(["1:1 meetings", "Written feedback", "Team retrospectives", "Instant messages"]) },
           { text: "What is one thing we could do to improve your work experience?", type: "free_text", order: 4 },
@@ -168,7 +168,7 @@ async function main() {
     "Regular skip-level meetings would help leadership understand ground-level challenges better.",
     "Our health benefits could be improved. Dental coverage is particularly lacking.",
     "I love the learning stipend! More support for conference attendance would be great.",
-    "The open office layout is too noisy. Need more quiet focus areas or better noise-canceling headphones.",
+    "The open office layout is too noisy. Need more quiet focus areas or better noise-cancelling headphones.",
     "Recognition for small wins, not just big launches. Day-to-day effort matters too.",
     "Cross-team collaboration feels siloed. Maybe monthly cross-department lunch-and-learns?",
     "The recent all-hands was really inspiring. More transparency about company direction helps.",
@@ -257,7 +257,7 @@ async function main() {
             { questionId: survey3.questions[4].id, textValue: [
               "More cross-team projects to learn from other departments.",
               "Regular team retrospectives focused on process improvement.",
-              "A mentorship matching program for career growth.",
+              "A mentorship matching programme for career growth.",
               "Better async communication norms to reduce meeting fatigue.",
               "Celebrating small wins more often to boost team morale.",
             ][i] },
@@ -328,8 +328,8 @@ async function main() {
     { title: "Schedule monthly 1:1 career development chats", description: "Set up recurring 30-min sessions with each direct report to discuss career goals and growth plans", status: "in_progress", priority: "high", dueDate: new Date("2026-04-15"), createdById: engManager.id, teamId: frontend.id },
     { title: "Set up weekly async standup", description: "Move daily standups to async format using Slack to reduce meeting fatigue", status: "open", priority: "medium", dueDate: new Date("2026-04-20"), createdById: engManager.id, teamId: frontend.id },
     { title: "Research remote collaboration tools", description: "Evaluate Miro, FigJam, and other tools for better remote brainstorming sessions", status: "completed", priority: "low", dueDate: new Date("2026-03-30"), createdById: mktManager.id, teamId: content.id },
-    { title: "Plan team building activity", description: "Organize a virtual escape room or game night for Q2 kickoff", status: "open", priority: "medium", dueDate: new Date("2026-04-25"), createdById: csManager.id, teamId: support1.id },
-    { title: "Create mentorship program proposal", description: "Draft a proposal for a structured mentorship program pairing senior and junior team members", status: "in_progress", priority: "high", dueDate: new Date("2026-04-30"), createdById: engManager.id, teamId: backend.id },
+    { title: "Plan team building activity", description: "Organise a virtual escape room or game night for Q2 kickoff", status: "open", priority: "medium", dueDate: new Date("2026-04-25"), createdById: csManager.id, teamId: support1.id },
+    { title: "Create mentorship programme proposal", description: "Draft a proposal for a structured mentorship programme pairing senior and junior team members", status: "in_progress", priority: "high", dueDate: new Date("2026-04-30"), createdById: engManager.id, teamId: backend.id },
     { title: "Update team documentation", description: "Review and update onboarding docs and runbooks based on new team member feedback", status: "completed", priority: "medium", dueDate: new Date("2026-03-15"), createdById: csManager.id, teamId: support2.id },
   ];
 
