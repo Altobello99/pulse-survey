@@ -622,6 +622,7 @@ function QuestionSummary({ title, questions, tone }: { title: string; questions:
 
 function EnpsGuide({ score }: { score: number | null }) {
   const position = score === null ? 50 : Math.max(0, Math.min(100, (score + 100) / 2));
+  const bandWidths = "50fr 15fr 20fr 15fr";
   return (
     <section className="border-y border-slate-200 bg-white py-5">
       <div className="px-4 sm:px-5">
@@ -633,13 +634,13 @@ function EnpsGuide({ score }: { score: number | null }) {
               <div className="mx-auto h-2 w-px bg-slate-950" />
             </div>
           )}
-          <div className="grid h-5 grid-cols-4 overflow-hidden rounded-sm">
+          <div className="grid h-5 overflow-hidden rounded-sm" style={{ gridTemplateColumns: bandWidths }}>
             <div className="bg-red-500" />
             <div className="bg-amber-400" />
             <div className="bg-sky-500" />
             <div className="bg-emerald-500" />
           </div>
-          <div className="mt-2 grid grid-cols-4 text-center text-xs">
+          <div className="mt-2 grid text-center text-xs" style={{ gridTemplateColumns: bandWidths }}>
             <div><strong>-100 to 0</strong><span className="block text-slate-500">Significant dissatisfaction</span></div>
             <div><strong>0 to 30</strong><span className="block text-slate-500">Room for improvement</span></div>
             <div><strong>30 to 70</strong><span className="block text-slate-500">Healthy satisfaction</span></div>
