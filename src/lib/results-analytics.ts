@@ -126,8 +126,15 @@ export async function buildResultsData(
   });
   if (!survey) throw new ResultsAccessError("Survey not found", 404);
 
+  const actorEmail = normalizeEmail(access.user.email);
+  const actorGrant = access.canManage
+    ? null
+    : await prisma.surveyResultsGrant.findUnique({
+        where: { surveyId_leaderEmail: { surveyId, leaderEmail: actorEmail } },
+      });
+  const viewerRelease = mergeRelease(survey.resultsRelease, actorGrant);
   const released = Boolean(
-    survey.resultsRelease?.resultsReleasedAt &&
+    viewerRelease.resultsReleasedAt &&
       (survey.status === "closed" || survey.endDate < new Date())
   );
   if (!access.canManage && !released) {
@@ -135,7 +142,7 @@ export async function buildResultsData(
       locked: true,
       access: serializeAccess(access),
       survey: serializeSurvey(survey),
-      release: serializeRelease(survey.resultsRelease),
+      release: serializeRelease(viewerRelease),
       anonymityThreshold: ANONYMITY_THRESHOLD,
     };
   }
@@ -186,7 +193,6 @@ export async function buildResultsData(
   ]);
 
   const allRoster = roster.map(normalizeSnapshot);
-  const actorEmail = normalizeEmail(access.user.email);
   const requestedViewAs = normalizeEmail(filters.viewAsEmail);
   const viewAsEmail = access.canManage && requestedViewAs ? requestedViewAs : null;
   const effectiveEmail = viewAsEmail || actorEmail;
@@ -195,6 +201,11 @@ export async function buildResultsData(
   if (viewAsEmail && !leaderEmails.has(viewAsEmail)) {
     throw new ResultsAccessError("The selected leader does not have a reporting group in this survey.", 400);
   }
+  const targetGrant = viewAsEmail
+    ? await prisma.surveyResultsGrant.findUnique({
+        where: { surveyId_leaderEmail: { surveyId, leaderEmail: viewAsEmail } },
+      })
+    : null;
 
   const requestedScope = filters.scope || (access.companyWide && !viewAsEmail ? "company" : "organization");
   const scope = normalizeScope(requestedScope, access.companyWide && !viewAsEmail);
@@ -285,7 +296,7 @@ export async function buildResultsData(
   const sentiment = buildSentiment(analyses);
   const reportable = isReportableGroup(selectedCompletions);
   const canSeeAllComments = access.canManage || access.executive;
-  const commentsReleased = Boolean(survey.resultsRelease?.commentsReleasedAt);
+  const commentsReleased = Boolean(viewerRelease.commentsReleasedAt);
   const allowManagerComments = !canSeeAllComments && commentsReleased;
   const names = employeeNames.map((employee) => employee.name).filter(Boolean);
   const comments = reportable
@@ -338,7 +349,7 @@ export async function buildResultsData(
     : access.canManage
       ? generatedInsights.map((insight) => ({ ...insight, id: null, status: "pending" }))
       : [];
-  const insightsReleased = Boolean(survey.resultsRelease?.insightsReleasedAt);
+  const insightsReleased = Boolean(viewerRelease.insightsReleasedAt);
 
   await writeResultsAudit({
     surveyId,
@@ -362,7 +373,8 @@ export async function buildResultsData(
       viewingAsLeader: Boolean(viewAsEmail),
     },
     survey: serializeSurvey(survey),
-    release: serializeRelease(survey.resultsRelease),
+    release: serializeRelease(access.canManage ? survey.resultsRelease : viewerRelease),
+    targetRelease: viewAsEmail ? serializeRelease(targetGrant) : null,
     scope: {
       type: scope,
       label: scopeLabel,
@@ -410,16 +422,30 @@ export async function buildResultsData(
 export async function getResultsCatalog(sessionUser: SessionUser) {
   const access = await getResultsAccessContext(sessionUser);
   if (!access.allowed || !access.user) throw new ResultsAccessError("Forbidden", 403);
+  const actorEmail = normalizeEmail(access.user.email);
 
   const surveys = await prisma.survey.findMany({
     where: access.canManage
       ? { status: { in: ["active", "closed"] } }
       : {
           status: "closed",
-          resultsRelease: { resultsReleasedAt: { not: null } },
+          OR: [
+            { resultsRelease: { resultsReleasedAt: { not: null } } },
+            {
+              resultsGrants: {
+                some: {
+                  leaderEmail: actorEmail,
+                  resultsReleasedAt: { not: null },
+                },
+              },
+            },
+          ],
         },
     orderBy: { startDate: "desc" },
-    include: { resultsRelease: true },
+    include: {
+      resultsRelease: true,
+      resultsGrants: { where: { leaderEmail: actorEmail } },
+    },
   });
 
   const latestSurvey = surveys[0];
@@ -450,7 +476,11 @@ export async function getResultsCatalog(sessionUser: SessionUser) {
     access: serializeAccess(access),
     surveys: surveys.map((survey) => ({
       ...serializeSurvey(survey),
-      release: serializeRelease(survey.resultsRelease),
+      release: serializeRelease(
+        access.canManage
+          ? survey.resultsRelease
+          : mergeRelease(survey.resultsRelease, survey.resultsGrants[0] || null)
+      ),
     })),
     leaders,
   };
@@ -527,6 +557,28 @@ function serializeRelease(
     resultsReleasedAt: release?.resultsReleasedAt?.toISOString() || null,
     insightsReleasedAt: release?.insightsReleasedAt?.toISOString() || null,
     commentsReleasedAt: release?.commentsReleasedAt?.toISOString() || null,
+  };
+}
+
+function mergeRelease(
+  globalRelease: {
+    resultsReleasedAt: Date | null;
+    insightsReleasedAt: Date | null;
+    commentsReleasedAt: Date | null;
+  } | null,
+  targetedRelease: {
+    resultsReleasedAt: Date | null;
+    insightsReleasedAt: Date | null;
+    commentsReleasedAt: Date | null;
+  } | null
+) {
+  return {
+    resultsReleasedAt:
+      globalRelease?.resultsReleasedAt || targetedRelease?.resultsReleasedAt || null,
+    insightsReleasedAt:
+      globalRelease?.insightsReleasedAt || targetedRelease?.insightsReleasedAt || null,
+    commentsReleasedAt:
+      globalRelease?.commentsReleasedAt || targetedRelease?.commentsReleasedAt || null,
   };
 }
 

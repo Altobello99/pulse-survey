@@ -119,6 +119,7 @@ type ResultsData = {
   };
   survey: { id: string; title: string; status: string; startDate: string; endDate: string };
   release: ReleaseState;
+  targetRelease: ReleaseState | null;
   scope: {
     type: string;
     label: string;
@@ -425,6 +426,9 @@ export default function ResultsPage() {
             <ReleaseCentre
               surveyId={surveyId}
               release={data.release}
+              targetRelease={data.targetRelease}
+              targetEmail={filters.viewAs}
+              targetName={catalog.leaders.find((leader) => leader.email === filters.viewAs)?.name || ""}
               onChanged={refresh}
             />
           )}
@@ -1276,7 +1280,14 @@ function ThemePanel({ themes }: { themes: ResultsData["themes"] }) {
   );
 }
 
-function ReleaseCentre({ surveyId, release, onChanged }: { surveyId: string; release: ReleaseState; onChanged: () => Promise<void> }) {
+function ReleaseCentre({ surveyId, release, targetRelease, targetEmail, targetName, onChanged }: {
+  surveyId: string;
+  release: ReleaseState;
+  targetRelease: ReleaseState | null;
+  targetEmail: string;
+  targetName: string;
+  onChanged: () => Promise<void>;
+}) {
   const [busy, setBusy] = useState("");
   const [releaseError, setReleaseError] = useState("");
   const change = async (kind: "results" | "insights" | "comments", released: boolean) => {
@@ -1296,11 +1307,33 @@ function ReleaseCentre({ surveyId, release, onChanged }: { surveyId: string; rel
     await onChanged();
     setBusy("");
   };
+  const changeManagerAccess = async (released: boolean) => {
+    setBusy("manager-test");
+    setReleaseError("");
+    const response = await fetch(`/api/results/${surveyId}/release`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ kind: "all", released, leaderEmail: targetEmail }),
+    });
+    const payload = await response.json();
+    if (!response.ok) {
+      setReleaseError(payload.error || "Unable to change manager test access.");
+      setBusy("");
+      return;
+    }
+    await onChanged();
+    setBusy("");
+  };
   const rows = [
     ["results", "Numerical results", "Scores, participation, benchmarks, and themes", release.resultsReleasedAt],
     ["insights", "AI-assisted insights", "HR-reviewed highlights and areas to watch", release.insightsReleasedAt],
     ["comments", "Approved comments", "Only comments marked approved by HR", release.commentsReleasedAt],
   ] as const;
+  const allGloballyReleased = Boolean(
+    release.resultsReleasedAt &&
+      release.insightsReleasedAt &&
+      release.commentsReleasedAt
+  );
   return (
     <details className="group border border-slate-300 bg-white">
       <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-3.5">
@@ -1310,6 +1343,34 @@ function ReleaseCentre({ surveyId, release, onChanged }: { surveyId: string; rel
       </summary>
       <div className="border-t border-slate-200">
         {releaseError && <div className="border-b border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-800">{releaseError}</div>}
+        {targetEmail && (
+          <div className="border-b border-blue-200 bg-blue-50 px-4 py-4">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 text-sm font-bold text-blue-950">
+                  <ShieldCheck className="h-4 w-4" />
+                  Manager test release
+                </div>
+                <p className="mt-1 text-sm text-blue-900">
+                  Release numerical results, approved insights, and approved comments to {targetName || "the selected manager"} only. This does not publish results to any other leader.
+                </p>
+              </div>
+              <div className="flex shrink-0 items-center gap-3">
+                <span className={`text-xs font-semibold ${targetRelease?.resultsReleasedAt ? "text-emerald-700" : "text-amber-700"}`}>
+                  {targetRelease?.resultsReleasedAt ? "Test access active" : "Not released"}
+                </span>
+                <button
+                  disabled={busy === "manager-test" || allGloballyReleased}
+                  onClick={() => changeManagerAccess(!targetRelease?.resultsReleasedAt)}
+                  className={`h-9 rounded-md px-3 text-sm font-semibold ${targetRelease?.resultsReleasedAt ? "border border-slate-300 bg-white text-slate-700 hover:bg-slate-50" : "bg-blue-700 text-white hover:bg-blue-800"} disabled:cursor-not-allowed disabled:opacity-50`}
+                >
+                  {targetRelease?.resultsReleasedAt ? "Revoke test access" : "Release everything to this manager"}
+                </button>
+              </div>
+            </div>
+            {allGloballyReleased && <p className="mt-2 text-xs text-blue-800">All result layers are already released globally, so separate test access is not required.</p>}
+          </div>
+        )}
         {rows.map(([kind, label, detail, timestamp]) => (
           <div key={kind} className="flex flex-col gap-3 border-b border-slate-100 px-4 py-3 last:border-0 sm:flex-row sm:items-center">
             <div className="flex-1"><div className="text-sm font-semibold text-slate-900">{label}</div><div className="text-xs text-slate-500">{detail}</div></div>

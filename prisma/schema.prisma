@@ -90,6 +90,7 @@ model Survey {
   anonymousTokens   AnonymousToken[]
   rosterSnapshots   SurveyRosterSnapshot[]
   resultsRelease    SurveyResultsRelease?
+  resultsGrants     SurveyResultsGrant[]
   resultComments    ResultCommentReview[]
   resultInsights    ResultInsight[]
   resultsAuditLogs  ResultsAuditLog[]
@@ -134,6 +135,24 @@ model SurveyResultsRelease {
   commentsReleasedBy String?
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
+}
+
+model SurveyResultsGrant {
+  id                 String    @id @default(cuid())
+  surveyId           String
+  survey             Survey    @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+  leaderEmail        String
+  resultsReleasedAt  DateTime?
+  resultsReleasedBy  String?
+  insightsReleasedAt DateTime?
+  insightsReleasedBy String?
+  commentsReleasedAt DateTime?
+  commentsReleasedBy String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@unique([surveyId, leaderEmail])
+  @@index([leaderEmail, surveyId])
 }
 
 model ResultCommentReview {
