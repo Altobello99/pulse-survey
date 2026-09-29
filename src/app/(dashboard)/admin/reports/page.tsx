@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { DecisionReports } from "@/components/reports/DecisionReports";
+import { DepartmentWorkbookDownloads } from "@/components/reports/DepartmentWorkbookDownloads";
 import { REPORT_DOWNLOADS } from "@/lib/report-downloads";
 import { formatDate } from "@/lib/utils";
 
@@ -117,6 +118,8 @@ export default function AdminReportsPage() {
               View Results
             </Link>
           </div>
+
+          <DepartmentWorkbookDownloads surveyId={survey.id} />
 
           <DecisionReports surveyId={survey.id} />
 
