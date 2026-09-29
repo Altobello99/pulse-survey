@@ -22,7 +22,11 @@ const COLORS = {
 export type ResultsExportData = {
   locked: boolean;
   survey: { title: string; startDate: string; endDate: string };
-  scope: { label: string; key: string };
+  scope: {
+    label: string;
+    key: string;
+    type: "company" | "organization" | "direct" | "leadership";
+  };
   metrics: {
     eligibleEmployees: number;
     completions: number;
@@ -166,7 +170,12 @@ export async function createResultsWorkbook(data: ResultsExportData) {
   writeTableSheet(
     aggregates,
     "Anonymous Aggregate Data",
-    ["Metric", "Selected scope", "Company benchmark", "Parent benchmark"],
+    [
+      "Metric",
+      data.scope.type === "company" ? "Company-wide view" : "Direct reports",
+      "Company benchmark",
+      "Department reporting group",
+    ],
     [
       ["Eligible employees", data.metrics.eligibleEmployees, "", ""],
       ["Completed", data.metrics.completions, "", ""],

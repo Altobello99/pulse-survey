@@ -533,7 +533,7 @@ function SummaryView({ data, onRefresh }: { data: ResultsData; onRefresh: () => 
 
 function BenchmarkStrip({ data }: { data: ResultsData }) {
   const selected = {
-    label: "Selected view",
+    label: data.scope.type === "company" ? "Company-wide view" : "Direct reports",
     participationRate: data.metrics.participationRate,
     averageRating: data.metrics.averageRating,
     favorablePercent: data.metrics.favorablePercent,
@@ -546,7 +546,7 @@ function BenchmarkStrip({ data }: { data: ResultsData }) {
   }>;
   return (
     <section>
-      <SectionHeading title="Benchmarks" detail="Compare the selected result with its parent group and the company." />
+      <SectionHeading title="Benchmarks" detail="Compare direct reports with the department reporting group and company-wide survey results." />
       <div className="mt-3 grid gap-px overflow-hidden rounded-md border border-slate-200 bg-slate-200 md:grid-cols-3">
         {benchmarks.map((benchmark) => (
           <div key={benchmark.label} className="bg-white p-4">

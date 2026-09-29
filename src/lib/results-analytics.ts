@@ -864,7 +864,7 @@ function buildParentBenchmark(input: {
     (employee) => employee.userId && completionIds.has(employee.userId)
   ).length;
   return benchmarkFromMetrics(
-    "Parent reporting group",
+    "Department reporting group",
     buildMetrics(input.questions, responses, parentRoster.length, completed)
   );
 }
@@ -1074,7 +1074,7 @@ function buildScopeLabel(
   ].filter(Boolean);
   if (parts.length) return `Team Results: ${parts.join(", ")}`;
   if (scope === "leadership") return "Direct leadership team";
-  if (scope === "direct") return "Direct team";
+  if (scope === "direct") return "Direct reports";
   return "My organization";
 }
 
@@ -1098,7 +1098,7 @@ function scopeOptions(
   return [
     ...(companyWide ? [{ value: "company", label: "Company-wide" }] : []),
     { value: "organization", label: "My organization" },
-    { value: "direct", label: "Direct team" },
+    { value: "direct", label: "Direct reports" },
     ...(hasLeadership
       ? [{ value: "leadership", label: "Direct leadership team" }]
       : []),
