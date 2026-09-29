@@ -45,7 +45,7 @@ export function DepartmentWorkbookDownloads({ surveyId }: { surveyId: string }) 
       <div className="flex flex-col gap-1">
         <h3 className="font-semibold text-slate-900">Department Workbook Packages</h3>
         <p className="text-sm text-slate-500">
-          Generate the styled master workbook or isolated leader files. Department files contain no written comments or other departments.
+          Generate the styled master workbook or isolated leader files. Department files include that department&apos;s detailed results and anonymous feedback, with no data from other departments.
         </p>
       </div>
 

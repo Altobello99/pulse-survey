@@ -272,8 +272,7 @@ export async function buildMasterDepartmentWorkbook(
     writeDepartmentDashboard(
       requiredSheet(workbook, sheetNames.get(department.id) || ""),
       department,
-      data,
-      true
+      data
     );
   }
   workbook.activeSheet("Read Me");
@@ -294,14 +293,15 @@ export async function buildSingleDepartmentWorkbook(
   );
   writeDepartmentReadMe(workbook, data, department);
   writeDepartmentBreakdown(requiredSheet(workbook, "Raw - Dept Breakdown"), [department]);
+  writeRawComments(requiredSheet(workbook, "Raw - Comments"), [department]);
   writeDepartmentDashboard(
     requiredSheet(workbook, "Department Results"),
     department,
-    data,
-    false
+    data
   );
   workbook.activeSheet("Department Results");
-  return asBuffer(await workbook.outputAsync("nodebuffer"));
+  const output = asBuffer(await workbook.outputAsync("nodebuffer"));
+  return repairChartSheetReferences(output);
 }
 
 export async function buildAllDepartmentWorkbooksZip(
@@ -447,7 +447,7 @@ function writeDepartmentReadMe(
   sheet.cell("C8").value(companyBenchmark(data));
   sheet.cell("B10").value("Privacy");
   sheet.cell("C11").value(
-    `Ratings are shown only with at least ${ANONYMITY_THRESHOLD} eligible completions. This workbook contains no written comments, employee identities, or data from other departments.`
+    `Ratings, themes, sentiment, and anonymous written comments are shown only with at least ${ANONYMITY_THRESHOLD} eligible completions. This workbook contains no employee identities or data from other departments.`
   );
   sheet.cell("B13").value("Distribution");
   sheet.cell("C14").value(
@@ -517,8 +517,7 @@ function writeRawComments(sheet: Sheet, departments: DepartmentReport[]) {
 function writeDepartmentDashboard(
   sheet: Sheet,
   department: DepartmentReport,
-  data: DepartmentWorkbookReportData,
-  includeComments: boolean
+  data: DepartmentWorkbookReportData
 ) {
   sheet.column("A").hidden(true);
   sheet.column("H").width(18);
@@ -546,12 +545,6 @@ function writeDepartmentDashboard(
   sheet.cell("B12").value(
     "The department score is the average across all standard 1-5 rating questions. The company-wide result is shown above for context."
   );
-
-  if (!includeComments) {
-    sheet.range("A14:M142").clear();
-    for (let row = 14; row <= 142; row += 1) sheet.row(row).hidden(true);
-    return;
-  }
 
   for (let row = 14; row <= 142; row += 1) sheet.row(row).hidden(false);
   const themeCounts = countThemes(department.comments);
