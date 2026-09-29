@@ -71,6 +71,30 @@ type HierarchyRow = {
   averageRating: number | null;
   favorablePercent: number | null;
   suppressed: boolean;
+  questions: QuestionResult[];
+};
+
+type ComparisonGroup = {
+  id: string;
+  type: "selected" | "company" | "reporting_group" | "department" | "combined";
+  label: string;
+  detail: string;
+  eligibleEmployees: number;
+  completions: number;
+  participationRate: number;
+  averageRating: number | null;
+  favorablePercent: number | null;
+  suppressed: boolean;
+  questions: QuestionResult[];
+};
+
+type ComparisonQuestion = {
+  id: string;
+  order: number;
+  section: string | null;
+  question: string;
+  scaleMax: number;
+  isEnps: boolean;
 };
 
 type Insight = {
@@ -137,6 +161,10 @@ type ResultsData = {
   };
   questions: QuestionResult[];
   hierarchy: HierarchyRow[];
+  comparison: {
+    questions: ComparisonQuestion[];
+    groups: ComparisonGroup[];
+  };
   sentiment: { positive: number; neutral: number; negative: number; mixed: number; total: number } | null;
   themes: Array<{ theme: string; mentions: number; critical: number; high: number; negative: number }>;
   comments: Array<{
@@ -202,7 +230,7 @@ export default function ResultsPage() {
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [error, setError] = useState("");
-  const [tab, setTab] = useState<"summary" | "hierarchy" | "questions" | "comments">("summary");
+  const [tab, setTab] = useState<"summary" | "comparison" | "hierarchy" | "questions" | "comments">("summary");
 
   const loadCatalog = useCallback(async () => {
     const response = await fetch("/api/results", { cache: "no-store" });
@@ -417,6 +445,7 @@ export default function ResultsPage() {
           <nav className="flex overflow-x-auto border-b border-slate-300" aria-label="Results views">
             {[
               ["summary", "Executive summary"],
+              ["comparison", "Compare"],
               ["hierarchy", "Hierarchy comparison"],
               ["questions", "Question scores"],
               ["comments", "Themes & comments"],
@@ -437,6 +466,9 @@ export default function ResultsPage() {
 
           {tab === "summary" && (
             <SummaryView data={data} onRefresh={loadResults} />
+          )}
+          {tab === "comparison" && (
+            <ComparisonView key={data.scope.key} data={data} />
           )}
           {tab === "hierarchy" && <HierarchyView rows={data.hierarchy} />}
           {tab === "questions" && <QuestionsView questions={data.questions} suppressed={data.metrics.suppressed} />}
@@ -711,6 +743,289 @@ function InsightCard({ insight, surveyId, editable, onRefresh }: { insight: Insi
       </div>
     </article>
   );
+}
+
+function ComparisonView({ data }: { data: ResultsData }) {
+  const [groupIds, setGroupIds] = useState(() => comparisonDefaultGroups(data.comparison.groups));
+  const [metricIds, setMetricIds] = useState<string[]>(["overall"]);
+  const groups = groupIds
+    .map((id) => data.comparison.groups.find((group) => group.id === id))
+    .filter((group): group is ComparisonGroup => Boolean(group));
+  const metrics = metricIds
+    .map((id) => {
+      if (id === "overall") {
+        return {
+          id,
+          order: 0,
+          section: "Summary",
+          question: "Overall rating across standard questions",
+          scaleMax: 5,
+          isEnps: false,
+        };
+      }
+      return data.comparison.questions.find((question) => question.id === id) || null;
+    })
+    .filter((metric): metric is ComparisonQuestion => Boolean(metric));
+  const chartMetric = metrics[0] || null;
+
+  const groupOptions = data.comparison.groups.map((group) => ({
+    value: group.id,
+    label: group.label,
+    detail: `${comparisonTypeLabel(group.type)} · ${group.completions}/${group.eligibleEmployees} completed`,
+  }));
+  const questionOptions = [
+    {
+      value: "overall",
+      label: "Overall rating",
+      detail: "Average across all standard 1-5 questions",
+    },
+    ...data.comparison.questions.map((question) => ({
+      value: question.id,
+      label: `Question ${question.order}: ${question.question}`,
+      detail: `${question.section || "General"} · out of ${question.scaleMax}`,
+    })),
+  ];
+
+  return (
+    <section className="space-y-6">
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+        <SectionHeading
+          title="Side-by-side comparison"
+          detail="Compare authorized reporting organizations, departments, and sites against company-wide results. No leader names or individual responses are shown."
+        />
+        <div className="flex flex-wrap gap-2">
+          <ComparisonSelector
+            icon={Building2}
+            label="Groups"
+            options={groupOptions}
+            selected={groupIds}
+            onChange={setGroupIds}
+            max={4}
+            searchPlaceholder="Search departments or groups"
+          />
+          <ComparisonSelector
+            icon={BarChart3}
+            label="Questions"
+            options={questionOptions}
+            selected={metricIds}
+            onChange={setMetricIds}
+            searchPlaceholder="Search survey questions"
+          />
+        </div>
+      </div>
+
+      <div className="flex items-start gap-3 border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+        <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
+        <p>
+          Company-wide uses the complete survey dataset. Every other column is limited to the current viewer&apos;s authorized BambooHR hierarchy and remains protected below {data.anonymityThreshold} completions.
+        </p>
+      </div>
+
+      {groups.length ? (
+        <>
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            {groups.map((group) => (
+              <article key={group.id} className="border border-slate-200 bg-white p-4">
+                <div className="flex min-h-12 items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-[11px] font-semibold uppercase text-primary-dark">{comparisonTypeLabel(group.type)}</div>
+                    <h3 className="mt-1 font-bold leading-5 text-slate-950">{group.label}</h3>
+                  </div>
+                  {group.suppressed && <LockKeyhole className="h-4 w-4 shrink-0 text-slate-400" />}
+                </div>
+                <div className="mt-4 grid grid-cols-3 gap-2 border-t border-slate-100 pt-3 text-center">
+                  <MiniMetric label="Participation" value={`${group.participationRate}%`} />
+                  <MiniMetric label="Completed" value={`${group.completions}/${group.eligibleEmployees}`} />
+                  <MiniMetric label="Average" value={group.averageRating === null ? "Protected" : `${group.averageRating}/5`} />
+                </div>
+              </article>
+            ))}
+          </div>
+
+          {chartMetric && (
+            <section>
+              <SectionHeading
+                title={chartMetric.id === "overall" ? "Overall rating comparison" : `Question ${chartMetric.order} comparison`}
+                detail={chartMetric.question}
+              />
+              <div className="mt-3 space-y-3 border border-slate-200 bg-white p-4">
+                {groups.map((group) => {
+                  const score = comparisonScore(group, chartMetric);
+                  return (
+                    <div key={group.id} className="grid min-h-10 items-center gap-3 sm:grid-cols-[minmax(180px,280px)_minmax(180px,1fr)_70px]">
+                      <div className="min-w-0 text-sm font-semibold text-slate-800">{group.label}</div>
+                      <div className="h-3 overflow-hidden rounded-full bg-slate-100">
+                        <div
+                          className="h-full bg-primary transition-all"
+                          style={{ width: score.average === null ? "0%" : `${Math.max(0, Math.min(100, (score.average / score.scaleMax) * 100))}%` }}
+                        />
+                      </div>
+                      <div className={`text-right text-sm font-bold ${scoreText(score.scaleMax === 5 ? score.average : null)}`}>
+                        {score.average === null ? "Protected" : `${score.average}/${score.scaleMax}`}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          )}
+
+          <section>
+            <SectionHeading title="Comparison matrix" detail="Add multiple questions to line up the same measure across each selected group." />
+            <div className="mt-3 overflow-x-auto border-y border-slate-200 bg-white">
+              <table className="w-full min-w-[900px] text-left text-sm">
+                <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+                  <tr>
+                    <th className="sticky left-0 z-10 min-w-80 bg-slate-50 px-4 py-3 font-semibold">Question or metric</th>
+                    {groups.map((group) => (
+                      <th key={group.id} className="min-w-52 px-4 py-3 font-semibold">
+                        <span className="block text-slate-700">{group.label}</span>
+                        <span className="mt-0.5 block text-[10px] font-medium normal-case text-slate-400">{group.completions}/{group.eligibleEmployees} completed</span>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {metrics.map((metric) => (
+                    <tr key={metric.id} className="align-top hover:bg-slate-50/60">
+                      <td className="sticky left-0 z-10 bg-white px-4 py-4">
+                        <div className="text-xs font-semibold uppercase text-primary-dark">{metric.section || "General"}{metric.id !== "overall" ? ` · Question ${metric.order}` : ""}</div>
+                        <div className="mt-1 max-w-xl font-semibold leading-5 text-slate-900">{metric.question}</div>
+                      </td>
+                      {groups.map((group) => (
+                        <ComparisonScoreCell key={group.id} group={group} metric={metric} />
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {!metrics.length && <div className="p-8 text-center text-sm text-slate-500">Select at least one question or metric to compare.</div>}
+            </div>
+          </section>
+        </>
+      ) : (
+        <div className="flex min-h-48 items-center justify-center border border-dashed border-slate-300 bg-slate-50 px-6 text-center text-sm text-slate-500">
+          Select at least one department or reporting group to begin comparing results.
+        </div>
+      )}
+    </section>
+  );
+}
+
+function ComparisonScoreCell({ group, metric }: { group: ComparisonGroup; metric: ComparisonQuestion }) {
+  const score = comparisonScore(group, metric);
+  return (
+    <td className="px-4 py-4">
+      {score.average === null ? (
+        <ProtectedInline />
+      ) : (
+        <>
+          <div className={`text-lg font-bold ${scoreText(score.scaleMax === 5 ? score.average : null)}`}>
+            {score.average} <span className="text-xs font-medium text-slate-400">/ {score.scaleMax}</span>
+          </div>
+          <div className="mt-1 text-xs text-slate-500">
+            {score.isEnps ? "Average recommendation rating" : `${score.favorablePercent ?? 0}% favorable`}
+          </div>
+          <div className="mt-0.5 text-xs text-slate-400">{score.responses ?? group.completions} responses</div>
+        </>
+      )}
+    </td>
+  );
+}
+
+function ComparisonSelector({ icon: Icon, label, options, selected, onChange, max, searchPlaceholder }: {
+  icon: typeof Filter;
+  label: string;
+  options: Array<{ value: string; label: string; detail: string }>;
+  selected: string[];
+  onChange: (selected: string[]) => void;
+  max?: number;
+  searchPlaceholder: string;
+}) {
+  const [query, setQuery] = useState("");
+  const visible = options.filter((option) => `${option.label} ${option.detail}`.toLowerCase().includes(query.toLowerCase()));
+  return (
+    <details className="group relative">
+      <summary className="flex h-10 cursor-pointer list-none items-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 hover:border-slate-400">
+        <Icon className="h-4 w-4 text-primary-dark" />
+        {label} ({selected.length})
+        <ChevronDown className="h-4 w-4 transition group-open:rotate-180" />
+      </summary>
+      <div className="absolute right-0 z-40 mt-1 w-[min(420px,calc(100vw-2rem))] overflow-hidden rounded-md border border-slate-200 bg-white shadow-xl">
+        <label className="relative block border-b border-slate-100 p-2">
+          <Search className="pointer-events-none absolute left-5 top-5 h-4 w-4 text-slate-400" />
+          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={searchPlaceholder} className="h-10 w-full rounded-md border border-slate-300 pl-9 pr-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/15" />
+        </label>
+        <div className="max-h-80 overflow-y-auto p-2">
+          {visible.map((option) => {
+            const checked = selected.includes(option.value);
+            const disabled = !checked && Boolean(max && selected.length >= max);
+            return (
+              <label key={option.value} className={`flex items-start gap-2 rounded px-2 py-2 ${disabled ? "cursor-not-allowed opacity-45" : "cursor-pointer hover:bg-slate-50"}`}>
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  disabled={disabled}
+                  onChange={() => onChange(checked ? selected.filter((value) => value !== option.value) : [...selected, option.value])}
+                  className="mt-0.5 h-4 w-4 accent-teal-600"
+                />
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-medium leading-5 text-slate-800">{option.label}</span>
+                  <span className="block text-xs leading-4 text-slate-500">{option.detail}</span>
+                </span>
+              </label>
+            );
+          })}
+          {!visible.length && <div className="px-2 py-6 text-center text-sm text-slate-500">No matching options.</div>}
+        </div>
+        <div className="flex items-center justify-between border-t border-slate-100 px-3 py-2 text-xs">
+          <span className="text-slate-500">{max ? `Choose up to ${max}` : "Choose one or more"}</span>
+          {selected.length > 0 && <button onClick={() => onChange([])} className="font-semibold text-primary-dark">Clear</button>}
+        </div>
+      </div>
+    </details>
+  );
+}
+
+function comparisonDefaultGroups(groups: ComparisonGroup[]) {
+  const reporting = groups.filter((group) => group.type === "reporting_group").slice(0, 2);
+  const company = groups.find((group) => group.type === "company");
+  if (reporting.length) return [...reporting, ...(company ? [company] : [])].map((group) => group.id).slice(0, 3);
+
+  const selected = groups.find((group) => group.type === "selected");
+  const departments = groups.filter((group) => group.type === "department" || group.type === "combined").slice(0, 2);
+  return [...(selected ? [selected] : []), ...(company ? [company] : []), ...departments]
+    .map((group) => group.id)
+    .filter((id, index, values) => values.indexOf(id) === index)
+    .slice(0, 3);
+}
+
+function comparisonScore(group: ComparisonGroup, metric: ComparisonQuestion) {
+  if (metric.id === "overall") {
+    return {
+      average: group.averageRating,
+      scaleMax: 5,
+      favorablePercent: group.favorablePercent,
+      responses: group.suppressed ? null : group.completions,
+      isEnps: false,
+    };
+  }
+  const question = group.questions.find((item) => item.id === metric.id);
+  return {
+    average: question?.average ?? null,
+    scaleMax: question?.scaleMax ?? metric.scaleMax,
+    favorablePercent: question?.favorablePercent ?? null,
+    responses: question?.responses ?? null,
+    isEnps: metric.isEnps,
+  };
+}
+
+function comparisonTypeLabel(type: ComparisonGroup["type"]) {
+  if (type === "company") return "Company-wide";
+  if (type === "selected") return "Current view";
+  if (type === "reporting_group") return "Reporting organization";
+  if (type === "combined") return "Combined department";
+  return "Department by site";
 }
 
 function HierarchyView({ rows }: { rows: HierarchyRow[] }) {

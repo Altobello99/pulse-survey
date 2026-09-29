@@ -249,6 +249,19 @@ export async function buildResultsData(
     responses: scopedResponses,
     completionIds,
   });
+  const comparison = buildComparisonData({
+    questions: survey.questions,
+    allRoster,
+    allResponses: responses,
+    selectedMetrics: metrics,
+    companyMetrics,
+    hierarchyRows,
+    completionIds,
+    effectiveEmail,
+    scope,
+    scopeLabel: buildScopeLabel(scope, selectedRoster, normalizedFilters),
+    filters: normalizedFilters,
+  });
   const textAnswers = scopedResponses.flatMap((response) =>
     response.answers
       .filter((answer) => Boolean(answer.textValue?.trim()))
@@ -372,6 +385,7 @@ export async function buildResultsData(
     },
     questions: reportable ? metrics.questions : metrics.questions.map(protectQuestion),
     hierarchy: hierarchyRows,
+    comparison,
     sentiment: reportable ? sentiment : null,
     themes: reportable ? themes : [],
     comments,
@@ -835,7 +849,174 @@ function compactMetrics(metrics: MetricSet) {
     averageRating: metrics.averageRating,
     favorablePercent: metrics.favorablePercent,
     suppressed: metrics.suppressed,
+    questions: metrics.questions,
   };
+}
+
+function buildComparisonData(input: {
+  questions: SurveyQuestion[];
+  allRoster: Snapshot[];
+  allResponses: ResponseRow[];
+  selectedMetrics: MetricSet;
+  companyMetrics: MetricSet;
+  hierarchyRows: HierarchyRow[];
+  completionIds: Set<string>;
+  effectiveEmail: string;
+  scope: NonNullable<ResultsFilters["scope"]>;
+  scopeLabel: string;
+  filters: ReturnType<typeof normalizeFilters>;
+}) {
+  const groups = [];
+  const selectedIsCompany = input.scope === "company" && !hasFilters(input.filters);
+
+  if (!selectedIsCompany) {
+    groups.push({
+      id: "selected",
+      type: "selected",
+      label:
+        input.scope === "leadership"
+          ? "Direct leadership team"
+          : input.scope === "company"
+            ? "Filtered company view"
+            : "Direct reports",
+      detail: input.scopeLabel,
+      ...comparisonMetrics(input.selectedMetrics),
+    });
+  }
+
+  groups.push({
+    id: "company",
+    type: "company",
+    label: "Company-wide",
+    detail: "All eligible employees and survey responses",
+    ...comparisonMetrics(input.companyMetrics),
+  });
+
+  groups.push(
+    ...buildReportingGroupComparisons({
+      questions: input.questions,
+      roster: input.allRoster,
+      responses: input.allResponses,
+      completionIds: input.completionIds,
+      effectiveEmail: input.effectiveEmail,
+      filters: input.filters,
+    })
+  );
+
+  groups.push(
+    ...input.hierarchyRows.map((row) => ({
+      id: row.id,
+      type: row.type,
+      label: row.label,
+      detail: row.type === "combined" ? "Combined department group" : "Department by site",
+      eligibleEmployees: row.eligibleEmployees,
+      completions: row.completions,
+      participationRate: row.participationRate,
+      averageRating: row.averageRating,
+      favorablePercent: row.favorablePercent,
+      suppressed: row.suppressed,
+      questions: row.questions,
+    }))
+  );
+
+  return {
+    questions: input.companyMetrics.questions.map((question) => ({
+      id: question.id,
+      order: question.order,
+      section: question.section,
+      question: question.question,
+      scaleMax: question.scaleMax,
+      isEnps: question.isEnps,
+    })),
+    groups: uniqueBy(groups, (group) => group.id),
+  };
+}
+
+function buildReportingGroupComparisons(input: {
+  questions: SurveyQuestion[];
+  roster: Snapshot[];
+  responses: ResponseRow[];
+  completionIds: Set<string>;
+  effectiveEmail: string;
+  filters: ReturnType<typeof normalizeFilters>;
+}) {
+  const leaderEmails = managerEmailsInRoster(input.roster);
+  const directLeaders = input.roster.filter(
+    (employee) =>
+      employee.managerEmail === input.effectiveEmail && leaderEmails.has(employee.email)
+  );
+  const provisional = directLeaders.flatMap((leader) => {
+    const fullRoster = descendantsFor(input.roster, leader.email);
+    const roster = applyRosterFilters(fullRoster, input.filters);
+    if (!roster.length) return [];
+
+    const reportingEmails = new Set([
+      leader.email,
+      ...fullRoster.map((employee) => employee.email),
+    ]);
+    const responses = input.responses.filter(
+      (response) =>
+        reportingEmails.has(normalizeEmail(response.managerEmail)) &&
+        responseMatchesFilters(response, input.filters)
+    );
+    const completions = roster.filter(
+      (employee) => employee.userId && input.completionIds.has(employee.userId)
+    ).length;
+    const metrics = buildMetrics(input.questions, responses, roster.length, completions);
+    return [
+      {
+        id: `reporting:${createHash("sha256").update(leader.email).digest("hex").slice(0, 12)}`,
+        type: "reporting_group",
+        label: reportingGroupLabel(roster),
+        detail: "Direct reporting organization",
+        ...comparisonMetrics(metrics),
+      },
+    ];
+  });
+
+  const labelTotals = provisional.reduce((totals, group) => {
+    totals.set(group.label, (totals.get(group.label) || 0) + 1);
+    return totals;
+  }, new Map<string, number>());
+  const labelCounts = new Map<string, number>();
+  return provisional.map((group) => {
+    const count = (labelCounts.get(group.label) || 0) + 1;
+    labelCounts.set(group.label, count);
+    return labelTotals.get(group.label) === 1
+      ? group
+      : { ...group, label: `${group.label} · Group ${count}` };
+  });
+}
+
+function comparisonMetrics(metrics: MetricSet) {
+  return {
+    eligibleEmployees: metrics.eligibleEmployees,
+    completions: metrics.completions,
+    participationRate: metrics.participationRate,
+    averageRating: metrics.averageRating,
+    favorablePercent: metrics.favorablePercent,
+    suppressed: metrics.suppressed,
+    questions: metrics.questions,
+  };
+}
+
+function reportingGroupLabel(roster: Snapshot[]) {
+  const departments = unique(roster.map((employee) => employee.departmentName));
+  const locations = unique(roster.map((employee) => shortLocation(employee.location)));
+  const department =
+    departments.length === 1 ? departments[0] : `${departments.length} departments`;
+  const location = locations.length === 1 ? locations[0] : `${locations.length} locations`;
+  return `${department}, ${location}`;
+}
+
+function uniqueBy<T>(values: T[], key: (value: T) => string) {
+  const seen = new Set<string>();
+  return values.filter((value) => {
+    const current = key(value);
+    if (seen.has(current)) return false;
+    seen.add(current);
+    return true;
+  });
 }
 
 function buildParentBenchmark(input: {
