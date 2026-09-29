@@ -301,7 +301,7 @@ export default function ResultsPage() {
           </div>
           <h1 className="text-3xl font-bold text-slate-950">Results</h1>
           <p className="mt-1 max-w-3xl text-sm text-slate-600">
-            Explore released pulse survey results by reporting scope, department, and location. Scores are pooled from the underlying responses and protected until at least three employees complete.
+            Explore released pulse survey results by reporting scope, department, and location. Scores are pooled from the underlying responses and protected until at least three employees have completed the survey.
           </p>
         </div>
         {data && !data.locked && !data.access.testRelease && (
@@ -359,7 +359,7 @@ export default function ResultsPage() {
                   </option>
                 ))}
               </select>
-              <span className="mt-1 block text-xs text-slate-500">Names appear only in this HR/admin access control, never in result content or exports.</span>
+              <span className="mt-1 block text-xs text-slate-500">Names appear only in HR and admin access controls; they never appear in results or exports.</span>
             </label>
           )}
         </div>
@@ -500,42 +500,42 @@ function KpiGrid({ data }: { data: ResultsData }) {
     {
       label: "Participation",
       value: `${data.metrics.participationRate}%`,
-      detail: `${data.metrics.completions}/${data.metrics.eligibleEmployees} completed`,
+      detail: `${data.metrics.completions} of ${data.metrics.eligibleEmployees} completed`,
       icon: Users,
       tone: "text-primary-dark",
     },
     {
       label: "Average rating",
       value: data.metrics.averageRating === null ? "Protected" : `${data.metrics.averageRating} / 5`,
-      detail: "all standard rating questions",
+      detail: "Across all standard rating questions",
       icon: BarChart3,
       tone: scoreText(data.metrics.averageRating),
     },
     {
       label: "Favorable",
       value: displayPercent(data.metrics.favorablePercent),
-      detail: "ratings of 4 or 5",
+      detail: "Ratings of 4 or 5",
       icon: CheckCircle2,
       tone: "text-emerald-600",
     },
     {
       label: "Company-wide eNPS",
       value: data.metrics.enps === null ? "N/A" : signed(data.metrics.enps),
-      detail: `${data.metrics.enpsResponses ?? 0} company responses`,
+      detail: `${data.metrics.enpsResponses ?? 0} company-wide responses`,
       icon: Target,
       tone: enpsTone(data.metrics.enps),
     },
     {
       label: "Best friend at work",
       value: displayPercent(data.metrics.friendYesPercent),
-      detail: "selected scope",
+      detail: "Selected reporting scope",
       icon: Users,
       tone: "text-blue-600",
     },
     {
       label: "Written comments",
       value: data.metrics.commentCount === null ? "Protected" : String(data.metrics.commentCount),
-      detail: "anonymous responses",
+      detail: "Anonymous written responses",
       icon: MessageSquareText,
       tone: "text-slate-900",
     },
@@ -566,7 +566,7 @@ function SummaryView({ data, onRefresh }: { data: ResultsData; onRefresh: () => 
     <div className="space-y-6">
       <BenchmarkStrip data={data} />
       <div className="grid gap-6 xl:grid-cols-2">
-        <QuestionSummary title="Highest scored" questions={highest} tone="positive" />
+        <QuestionSummary title="Highest-scoring questions" questions={highest} tone="positive" />
         <QuestionSummary title="Areas to watch" questions={lowest} tone="watch" />
       </div>
       <EnpsGuide score={data.metrics.enps} />
@@ -629,8 +629,14 @@ function QuestionSummary({ title, questions, tone }: { title: string; questions:
 }
 
 function EnpsGuide({ score }: { score: number | null }) {
-  const position = score === null ? 50 : Math.max(0, Math.min(100, (score + 100) / 2));
+  const position = score === null ? 50 : Math.max(2, Math.min(98, (score + 100) / 2));
   const bandWidths = "50fr 15fr 20fr 15fr";
+  const bands = [
+    ["-100 to 0", "Significant dissatisfaction"],
+    ["0 to 30", "Room for improvement"],
+    ["30 to 70", "Healthy satisfaction"],
+    ["70 to 100", "Exceptional satisfaction"],
+  ];
   return (
     <section className="border-y border-slate-200 bg-white py-5">
       <div className="px-4 sm:px-5">
@@ -648,11 +654,11 @@ function EnpsGuide({ score }: { score: number | null }) {
             <div className="bg-sky-500" />
             <div className="bg-emerald-500" />
           </div>
-          <div className="mt-2 grid text-center text-xs" style={{ gridTemplateColumns: bandWidths }}>
-            <div><strong>-100 to 0</strong><span className="block text-slate-500">Significant dissatisfaction</span></div>
-            <div><strong>0 to 30</strong><span className="block text-slate-500">Room for improvement</span></div>
-            <div><strong>30 to 70</strong><span className="block text-slate-500">Healthy satisfaction</span></div>
-            <div><strong>70 to 100</strong><span className="block text-slate-500">Exceptional satisfaction</span></div>
+          <div className="mt-2 hidden text-center text-xs sm:grid" style={{ gridTemplateColumns: bandWidths }}>
+            {bands.map(([range, label]) => <div key={range} className="min-w-0 px-1"><strong>{range}</strong><span className="block leading-4 text-slate-500">{label}</span></div>)}
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-2 text-xs sm:hidden">
+            {bands.map(([range, label]) => <div key={range} className="border border-slate-200 bg-slate-50 p-2 text-center"><strong>{range}</strong><span className="mt-0.5 block leading-4 text-slate-500">{label}</span></div>)}
           </div>
         </div>
       </div>
@@ -697,7 +703,7 @@ function InsightPanel({ data, onRefresh }: { data: ResultsData; onRefresh: () =>
           ))}
         </div>
       ) : (
-        <div className="mt-3 border border-slate-200 bg-white p-5 text-sm text-slate-500">No reportable insight is available for this filtered view.</div>
+        <div className="mt-3 border border-slate-200 bg-white p-5 text-sm text-slate-500">No reportable insights are available for this filtered view.</div>
       )}
     </section>
   );
@@ -830,15 +836,15 @@ function ComparisonView({ data }: { data: ResultsData }) {
       <div className="flex items-start gap-3 border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
         <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
         <p>
-          Company-wide uses the complete survey dataset. Every other column is limited to the current viewer&apos;s authorized BambooHR hierarchy and remains protected below {data.anonymityThreshold} completions.
+          The company-wide comparison uses the complete survey dataset. Every other column is limited to the current viewer&apos;s authorized BambooHR hierarchy and remains protected until at least {data.anonymityThreshold} employees have completed the survey.
         </p>
       </div>
 
       {groups.length ? (
         <>
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
             {groups.map((group) => (
-              <article key={group.id} className="border border-slate-200 bg-white p-4">
+              <article key={group.id} className="min-w-0 overflow-hidden border border-slate-200 bg-white p-4">
                 <div className="flex min-h-12 items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="text-[11px] font-semibold uppercase text-primary-dark">{comparisonTypeLabel(group.type)}</div>
@@ -846,7 +852,7 @@ function ComparisonView({ data }: { data: ResultsData }) {
                   </div>
                   {group.suppressed && <LockKeyhole className="h-4 w-4 shrink-0 text-slate-400" />}
                 </div>
-                <div className="mt-4 grid grid-cols-3 gap-2 border-t border-slate-100 pt-3 text-center">
+                <div className="mt-4 grid grid-cols-3 gap-1 border-t border-slate-100 pt-3 text-center sm:gap-2">
                   <MiniMetric label="Participation" value={`${group.participationRate}%`} />
                   <MiniMetric label="Completed" value={`${group.completions}/${group.eligibleEmployees}`} />
                   <MiniMetric label="Average" value={group.averageRating === null ? "Protected" : `${group.averageRating}/5`} />
@@ -865,7 +871,7 @@ function ComparisonView({ data }: { data: ResultsData }) {
                 {groups.map((group) => {
                   const score = comparisonScore(group, chartMetric);
                   return (
-                    <div key={group.id} className="grid min-h-10 items-center gap-3 sm:grid-cols-[minmax(180px,280px)_minmax(180px,1fr)_70px]">
+                    <div key={group.id} className="grid min-h-10 items-center gap-3 sm:grid-cols-[minmax(180px,280px)_minmax(180px,1fr)_96px]">
                       <div className="min-w-0 text-sm font-semibold text-slate-800">{group.label}</div>
                       <div className="h-3 overflow-hidden rounded-full bg-slate-100">
                         <div
@@ -918,7 +924,7 @@ function ComparisonView({ data }: { data: ResultsData }) {
         </>
       ) : (
         <div className="flex min-h-48 items-center justify-center border border-dashed border-slate-300 bg-slate-50 px-6 text-center text-sm text-slate-500">
-          Select at least one department or reporting group to begin comparing results.
+          Select at least one comparison group to begin comparing results.
         </div>
       )}
     </section>
@@ -1034,7 +1040,7 @@ function comparisonScore(group: ComparisonGroup, metric: ComparisonQuestion) {
 }
 
 function comparisonTypeLabel(type: ComparisonGroup["type"]) {
-  if (type === "company") return "Company-wide";
+  if (type === "company") return "Company benchmark";
   if (type === "selected") return "Current view";
   if (type === "reporting_group") return "Reporting organization";
   if (type === "combined") return "Combined department";
@@ -1058,15 +1064,15 @@ function HierarchyView({ rows }: { rows: HierarchyRow[] }) {
   return (
     <section>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <SectionHeading title="Department by site" detail="Combined Production totals are followed by authorized department and location results." />
-        <div className="flex gap-2">
+        <SectionHeading title="Department by site" detail="Combined Production totals appear first, followed by authorized department and location results." />
+        <div className="flex flex-col gap-2 sm:flex-row">
           <SearchInput value={query} onChange={setQuery} placeholder="Search department or site" />
-          <select value={sort} onChange={(event) => setSort(event.target.value as typeof sort)} className="h-10 rounded-md border border-slate-300 bg-white px-3 text-sm">
+          <select value={sort} onChange={(event) => setSort(event.target.value as typeof sort)} className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm sm:w-auto">
             <option value="alpha">Alphabetical</option>
-            <option value="participation-high">Participation high to low</option>
-            <option value="participation-low">Participation low to high</option>
-            <option value="rating-high">Rating high to low</option>
-            <option value="rating-low">Rating low to high</option>
+            <option value="participation-high">Participation: high to low</option>
+            <option value="participation-low">Participation: low to high</option>
+            <option value="rating-high">Rating: high to low</option>
+            <option value="rating-low">Rating: low to high</option>
           </select>
         </div>
       </div>
@@ -1074,9 +1080,9 @@ function HierarchyView({ rows }: { rows: HierarchyRow[] }) {
         <table className="w-full min-w-[900px] text-left text-sm">
           <thead className="bg-slate-50 text-xs uppercase text-slate-500">
             <tr>
-              <th className="px-4 py-3 font-semibold">Team result</th>
-              <th className="px-4 py-3 font-semibold">Eligible</th>
-              <th className="px-4 py-3 font-semibold">Completed</th>
+              <th className="px-4 py-3 font-semibold">Department / site</th>
+              <th className="px-4 py-3 font-semibold">Eligible employees</th>
+              <th className="px-4 py-3 font-semibold">Completed surveys</th>
               <th className="px-4 py-3 font-semibold">Participation</th>
               <th className="px-4 py-3 font-semibold">Average (out of 5)</th>
               <th className="px-4 py-3 font-semibold">Favorable</th>
@@ -1095,7 +1101,7 @@ function HierarchyView({ rows }: { rows: HierarchyRow[] }) {
             ))}
           </tbody>
         </table>
-        {!sorted.length && <div className="p-8 text-center text-sm text-slate-500">No team result matches this search.</div>}
+        {!sorted.length && <div className="p-8 text-center text-sm text-slate-500">No department or site matches this search.</div>}
       </div>
     </section>
   );
@@ -1113,13 +1119,13 @@ function QuestionsView({ questions, suppressed }: { questions: QuestionResult[];
   return (
     <section>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <SectionHeading title="Question-level scores" detail="Every rating question shows its own average, response count, and favorable distribution." />
-        <div className="flex gap-2">
+        <SectionHeading title="Question-level scores" detail="Every rating question shows its average, response count, and distribution of favorable responses." />
+        <div className="flex flex-col gap-2 sm:flex-row">
           <SearchInput value={query} onChange={setQuery} placeholder="Search questions" />
-          <select value={sort} onChange={(event) => setSort(event.target.value as typeof sort)} className="h-10 rounded-md border border-slate-300 bg-white px-3 text-sm">
+          <select value={sort} onChange={(event) => setSort(event.target.value as typeof sort)} className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm sm:w-auto">
             <option value="order">Survey order</option>
-            <option value="high">Score high to low</option>
-            <option value="low">Score low to high</option>
+            <option value="high">Score: high to low</option>
+            <option value="low">Score: low to high</option>
           </select>
         </div>
       </div>
@@ -1187,7 +1193,7 @@ function CommentsView({ data, surveyId, onRefresh }: { data: ResultsData; survey
     <div className="space-y-6">
       <div className="grid gap-6 xl:grid-cols-[1.05fr_1.95fr]">
         <section>
-          <SectionHeading title="Sentiment" detail="AI-analyzed written comments in this reportable scope." />
+          <SectionHeading title="Sentiment" detail="AI analysis of written comments in this reportable scope." />
           <SentimentPanel sentiment={data.sentiment} />
         </section>
         <section>
@@ -1206,7 +1212,7 @@ function CommentsView({ data, surveyId, onRefresh }: { data: ResultsData; survey
               {departments.map((item) => <option key={item}>{item}</option>)}
             </select>
             <select value={severity} onChange={(event) => setSeverity(event.target.value)} className="h-10 rounded-md border border-slate-300 bg-white px-3 text-sm">
-              <option value="">All severity</option>
+              <option value="">All severity levels</option>
               {['critical', 'high', 'needs_review', 'medium', 'low', 'pending'].map((item) => <option key={item} value={item}>{labelize(item)}</option>)}
             </select>
           </div>
@@ -1221,7 +1227,7 @@ function CommentsView({ data, surveyId, onRefresh }: { data: ResultsData; survey
                 <span className="text-slate-600">{comment.location}</span>
                 <span className={`rounded-full px-2 py-0.5 font-semibold ${severityBadge(comment.severity)}`}>{labelize(comment.severity)}</span>
                 <span className="rounded-full bg-slate-100 px-2 py-0.5 font-medium text-slate-600">{labelize(comment.sentiment)}</span>
-                {comment.status && <span className={`rounded-full px-2 py-0.5 font-semibold ${statusBadge(comment.status)}`}>{comment.status}</span>}
+                {comment.status && <span className={`rounded-full px-2 py-0.5 font-semibold ${statusBadge(comment.status)}`}>{labelize(comment.status)}</span>}
               </div>
               <p className="mt-3 text-[15px] leading-6 text-slate-800">{comment.text}</p>
               <p className="mt-2 text-xs text-slate-500">In response to: {comment.question}</p>
@@ -1276,10 +1282,10 @@ function ThemePanel({ themes }: { themes: ResultsData["themes"] }) {
     <div className="mt-3 border border-slate-200 bg-white p-4">
       <div className="space-y-3">
         {themes.slice(0, 10).map((theme, index) => (
-          <div key={theme.theme} className="grid grid-cols-[28px_minmax(130px,1fr)_minmax(120px,2fr)_42px] items-center gap-2 text-sm">
+          <div key={theme.theme} className="grid grid-cols-[24px_minmax(0,1fr)_36px] items-center gap-2 text-sm sm:grid-cols-[28px_minmax(130px,1fr)_minmax(120px,2fr)_42px]">
             <span className="font-bold text-slate-400">{index + 1}</span>
             <span className="font-medium text-slate-800">{theme.theme}</span>
-            <div className="h-2 overflow-hidden rounded-full bg-slate-100"><div className={`h-full ${theme.critical || theme.high ? "bg-red-500" : "bg-primary"}`} style={{ width: `${(theme.mentions / max) * 100}%` }} /></div>
+            <div className="hidden h-2 overflow-hidden rounded-full bg-slate-100 sm:block"><div className={`h-full ${theme.critical || theme.high ? "bg-red-500" : "bg-primary"}`} style={{ width: `${(theme.mentions / max) * 100}%` }} /></div>
             <span className="text-right font-semibold text-slate-700">{theme.mentions}</span>
           </div>
         ))}
@@ -1364,7 +1370,7 @@ function ReleaseCentre({ surveyId, release, targetRelease, targetEmail, targetNa
                   Release numerical results, approved insights, and approved comments to {targetName || "the selected manager"} only. This does not publish results to any other leader.
                 </p>
                 <p className="mt-1 text-xs text-blue-800">
-                  Access is limited to their BambooHR reporting hierarchy, the 3-completion privacy rule remains enforced, downloads are disabled, and revocation blocks all current and legacy result views.
+                  Access is limited to their BambooHR reporting hierarchy. The minimum of three completions remains enforced, downloads are disabled, and revocation blocks all current and legacy result views.
                 </p>
               </div>
               <div className="flex shrink-0 items-center gap-3">
@@ -1438,7 +1444,7 @@ function LockedResults({ data }: { data: LockedData }) {
       <div className="max-w-lg">
         <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-slate-100 text-slate-500"><LockKeyhole className="h-7 w-7" /></div>
         <h2 className="mt-5 text-xl font-bold text-slate-950">Results are awaiting HR release</h2>
-        <p className="mt-2 text-sm leading-6 text-slate-600">The survey is closed, but numerical results have not been published to this reporting hierarchy yet. Scores will remain anonymous and appear only for groups with {data.anonymityThreshold} or more completions.</p>
+        <p className="mt-2 text-sm leading-6 text-slate-600">The survey is closed, but numerical results have not been released to this reporting hierarchy yet. Scores remain anonymous and appear only for groups with {data.anonymityThreshold} or more completions.</p>
       </div>
     </div>
   );
@@ -1448,13 +1454,13 @@ function PrivacyBadge({ suppressed, threshold }: { suppressed: boolean; threshol
   return (
     <div className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold ${suppressed ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-800"}`}>
       {suppressed ? <LockKeyhole className="h-3.5 w-3.5" /> : <ShieldCheck className="h-3.5 w-3.5" />}
-      {suppressed ? `Protected: fewer than ${threshold} completions` : `${threshold}+ completion privacy rule met`}
+      {suppressed ? `Protected: fewer than ${threshold} completions` : `Minimum of ${threshold} completions met`}
     </div>
   );
 }
 
 function ProtectedPanel() {
-  return <div className="flex min-h-28 items-center justify-center border border-dashed border-slate-300 bg-slate-50 px-4 text-center text-sm text-slate-500"><LockKeyhole className="mr-2 h-4 w-4" />Scores appear once at least three employees complete in the selected scope.</div>;
+  return <div className="flex min-h-28 items-center justify-center border border-dashed border-slate-300 bg-slate-50 px-4 text-center text-sm text-slate-500"><LockKeyhole className="mr-2 h-4 w-4 shrink-0" />Scores appear after at least three employees have completed the survey in the selected scope.</div>;
 }
 
 function ProtectedInline() {
@@ -1466,7 +1472,8 @@ function Progress({ value, label }: { value: number; label: string }) {
 }
 
 function MiniMetric({ label, value }: { label: string; value: string }) {
-  return <div><div className="text-lg font-bold text-slate-950">{value}</div><div className="text-[11px] text-slate-500">{label}</div></div>;
+  const compact = value.length > 7;
+  return <div className="min-w-0"><div title={value} className={`${compact ? "text-base" : "text-lg"} break-words font-bold leading-tight text-slate-950`}>{value}</div><div className="mt-1 break-words text-[11px] leading-4 text-slate-500">{label}</div></div>;
 }
 
 function SectionHeading({ title, detail }: { title: string; detail?: string }) {
@@ -1474,7 +1481,7 @@ function SectionHeading({ title, detail }: { title: string; detail?: string }) {
 }
 
 function SearchInput({ value, onChange, placeholder }: { value: string; onChange: (value: string) => void; placeholder: string }) {
-  return <label className="relative block"><Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-slate-400" /><input value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} className="h-10 w-56 rounded-md border border-slate-300 bg-white pl-9 pr-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/15" /></label>;
+  return <label className="relative block w-full sm:w-56"><Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-slate-400" /><input value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} className="h-10 w-full rounded-md border border-slate-300 bg-white pl-9 pr-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/15" /></label>;
 }
 
 function IconButton({ title, onClick, icon: Icon, active }: { title: string; onClick: () => void; icon: typeof Pencil; active?: boolean }) {
@@ -1561,7 +1568,7 @@ function formatDateTime(value: string) {
 }
 
 function commentAccessText(data: ResultsData) {
-  if (data.commentAccess.mode === "review") return `${data.commentAccess.totalInScope ?? 0} comments in scope. Approve or withhold comments before the manager release.`;
+  if (data.commentAccess.mode === "review") return `${data.commentAccess.totalInScope ?? 0} comments in scope. Approve or withhold comments before releasing them to managers.`;
   if (data.commentAccess.mode === "all") return "Full anonymous comments are available for C-suite review.";
   return data.commentAccess.released ? "Only comments approved and released by HR are shown." : "HR has not released approved comments yet.";
 }

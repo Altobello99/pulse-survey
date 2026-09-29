@@ -1138,8 +1138,13 @@ function reportingGroupLabel(roster: Snapshot[]) {
   const departments = unique(roster.map((employee) => employee.departmentName));
   const locations = unique(roster.map((employee) => shortLocation(employee.location)));
   const department =
-    departments.length === 1 ? departments[0] : `${departments.length} departments`;
-  const location = locations.length === 1 ? locations[0] : `${locations.length} locations`;
+    departments.length === 1 ? departments[0] : `${departments.length} Departments`;
+  const location =
+    locations.length === 1
+      ? locations[0]
+      : locations.length > 1
+        ? `${locations.length} Locations`
+        : "Location Not Listed";
   return `${department}, ${location}`;
 }
 
@@ -1296,7 +1301,7 @@ function buildInsightCandidates(input: {
       insightKey: "highest-question",
       kind: "highlight",
       title: "Highest-rated experience",
-      body: `${highest.question} leads ${input.scopeLabel.toLowerCase()} at ${highest.average} out of 5 (${highest.favorablePercent}% favorable).`,
+      body: `${highest.question} is the highest-rated item for this reporting group at ${highest.average} out of 5 (${highest.favorablePercent}% favorable).`,
       severity: "positive",
       evidence: JSON.stringify({ questionId: highest.id, average: highest.average }),
       sortOrder: 10,
@@ -1384,8 +1389,8 @@ function buildScopeLabel(
   const departments = unique(roster.map((employee) => employee.departmentName));
   const locations = unique(roster.map((employee) => shortLocation(employee.location)));
   const parts = [
-    departments.length === 1 ? departments[0] : departments.length > 1 ? `${departments.length} departments` : null,
-    locations.length === 1 ? locations[0] : locations.length > 1 ? `${locations.length} locations` : null,
+    departments.length === 1 ? departments[0] : departments.length > 1 ? `${departments.length} Departments` : null,
+    locations.length === 1 ? locations[0] : locations.length > 1 ? `${locations.length} Locations` : null,
   ].filter(Boolean);
   if (parts.length) return `Team Results: ${parts.join(", ")}`;
   if (scope === "leadership") return "Direct leadership team";
