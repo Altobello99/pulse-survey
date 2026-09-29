@@ -9,6 +9,21 @@ export const ADMIN_EMAILS = new Set(
     .filter(Boolean)
 );
 
+export const RESULTS_HR_EMAILS = new Set(
+  (
+    process.env.RESULTS_HR_EMAILS ||
+    [
+      "nikita.mann@clutch.ca",
+      "jiaxin.wang@clutch.ca",
+      "henry.stawarz@clutch.ca",
+      "michael-anthony.altobello@clutch.ca",
+    ].join(",")
+  )
+    .split(",")
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean)
+);
+
 export type AccessFilters = {
   departmentId?: string | null;
   division?: string | null;
@@ -63,12 +78,45 @@ export function isAdminEmail(email: string | null | undefined) {
   return ADMIN_EMAILS.has(normalizeEmail(email));
 }
 
+export function isResultsHrLeader(email: string | null | undefined) {
+  return RESULTS_HR_EMAILS.has(normalizeEmail(email));
+}
+
+export function isCompanyWideExecutive(jobTitle: string | null | undefined) {
+  return /\b(chief|ceo|founder)\b/i.test((jobTitle || "").trim());
+}
+
+export function hasCompanyWideResultsAccess(user: {
+  role?: string | null;
+  email?: string | null;
+  jobTitle?: string | null;
+}) {
+  return (
+    user.role === "admin" ||
+    isAdminEmail(user.email) ||
+    isResultsHrLeader(user.email) ||
+    isCompanyWideExecutive(user.jobTitle)
+  );
+}
+
+export function canManageResultsRelease(user: {
+  role?: string | null;
+  email?: string | null;
+}) {
+  return user.role === "admin" || isAdminEmail(user.email) || isResultsHrLeader(user.email);
+}
+
 export function canManageSurveys(user: SessionUser) {
   return user.role === "admin";
 }
 
 export function canViewResults(user: SessionUser) {
-  return user.role === "admin" || user.role === "manager";
+  return (
+    user.canViewResults ||
+    user.role === "admin" ||
+    user.role === "manager" ||
+    hasCompanyWideResultsAccess(user)
+  );
 }
 
 export function canViewRawComments(user: SessionUser) {
@@ -76,7 +124,7 @@ export function canViewRawComments(user: SessionUser) {
 }
 
 export async function getManagerScope(user: SessionUser) {
-  if (user.role === "admin") {
+  if (hasCompanyWideResultsAccess(user) && user.companyWideResults) {
     return {
       companyWide: true,
       employeeIds: [] as string[],
@@ -107,7 +155,11 @@ export async function getManagerScope(user: SessionUser) {
   const currentUser = allActiveUsers.find(
     (employee) => normalizeEmail(employee.email) === currentEmail
   );
-  const companyWide = isCompanyWideExecutive(currentUser?.jobTitle);
+  const companyWide = hasCompanyWideResultsAccess({
+    role: user.role,
+    email: user.email,
+    jobTitle: currentUser?.jobTitle,
+  });
 
   if (companyWide) {
     const employeeEmails = allActiveUsers.map((employee) => normalizeEmail(employee.email));
@@ -213,11 +265,6 @@ export async function getScopedResponseWhere(
     { AND: [base, { managerEmail: { in: scope.managerEmails } }] },
     filters
   );
-}
-
-function isCompanyWideExecutive(jobTitle: string | null | undefined) {
-  const normalizedTitle = (jobTitle || "").trim().toLowerCase();
-  return normalizedTitle === "ceo" || normalizedTitle === "chief executive officer";
 }
 
 function applyFilters(where: Prisma.SurveyResponseWhereInput, filters: AccessFilters) {

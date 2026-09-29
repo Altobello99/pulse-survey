@@ -27,11 +27,20 @@ const navItems = {
   ],
 };
 
+const resultsNavItem = {
+  href: "/results",
+  label: "Results",
+  icon: "M3 3v18h18M7 16v-5m5 5V7m5 9v-8",
+};
+
 export default function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
   const pathname = usePathname();
   const { data: session } = useSession();
   const role = (session?.user?.role || "employee") as keyof typeof navItems;
-  const items = navItems[role] || navItems.employee;
+  const roleItems = navItems[role] || navItems.employee;
+  const items = session?.user?.canViewResults
+    ? [roleItems[0], resultsNavItem, ...roleItems.slice(1)]
+    : roleItems;
   const adminLoginId = session?.user?.loginId || "admin";
   const displayName = role === "admin" ? "Admin" : session?.user?.name || "";
   const displayDetail = role === "admin" ? `User ID: ${adminLoginId}` : session?.user?.email || "";

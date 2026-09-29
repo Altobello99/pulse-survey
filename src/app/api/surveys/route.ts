@@ -7,6 +7,7 @@ import {
   isOnSurveyOpeningRoster,
   surveyRosterEmployeeWhere,
 } from "@/lib/access";
+import { ensureSurveyRosterSnapshot } from "@/lib/results-roster";
 
 type SurveyQuestionInput = {
   text: string;
@@ -121,6 +122,10 @@ export async function POST(request: NextRequest) {
     },
     include: { questions: true },
   });
+
+  if (survey.status === "active") {
+    await ensureSurveyRosterSnapshot(survey.id);
+  }
 
   return Response.json({ data: survey }, { status: 201 });
 }

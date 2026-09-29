@@ -3,7 +3,12 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import GoogleProvider from "next-auth/providers/google";
 import bcrypt from "bcryptjs";
 import { prisma } from "./prisma";
-import { isAdminEmail, normalizeEmail } from "./access";
+import {
+  canManageResultsRelease,
+  hasCompanyWideResultsAccess,
+  isAdminEmail,
+  normalizeEmail,
+} from "./access";
 import { getAdminPortalEmail, isAdminPortalLoginId, normalizeAdminLoginId } from "./admin-portal";
 
 type AppAuthUser = DefaultUser & {
@@ -11,6 +16,7 @@ type AppAuthUser = DefaultUser & {
   email: string;
   name: string;
   role: string;
+  jobTitle: string | null;
   departmentId: string;
   teamId: string | null;
   managerEmail: string | null;
@@ -18,6 +24,9 @@ type AppAuthUser = DefaultUser & {
   location: string | null;
   division: string | null;
   loginId?: string | null;
+  canViewResults: boolean;
+  canManageResults: boolean;
+  companyWideResults: boolean;
 };
 
 type GoogleProfile = Profile & {
@@ -41,6 +50,7 @@ function toAuthUser(user: {
   email: string;
   name: string;
   role: string;
+  jobTitle: string | null;
   departmentId: string;
   teamId: string | null;
   managerEmail: string | null;
@@ -48,11 +58,18 @@ function toAuthUser(user: {
   location: string | null;
   division: string | null;
 }, loginId?: string | null): AppAuthUser {
+  const role = isAdminEmail(user.email) ? "admin" : user.role;
+  const companyWideResults = hasCompanyWideResultsAccess({
+    role,
+    email: user.email,
+    jobTitle: user.jobTitle,
+  });
   return {
     id: user.id,
     name: user.name,
     email: user.email,
-    role: isAdminEmail(user.email) ? "admin" : user.role,
+    role,
+    jobTitle: user.jobTitle,
     departmentId: user.departmentId,
     teamId: user.teamId,
     managerEmail: user.managerEmail,
@@ -60,6 +77,9 @@ function toAuthUser(user: {
     location: user.location,
     division: user.division,
     loginId,
+    canViewResults: companyWideResults || role === "manager",
+    canManageResults: canManageResultsRelease({ role, email: user.email }),
+    companyWideResults,
   };
 }
 
@@ -150,6 +170,7 @@ export const authOptions: NextAuthOptions = {
         if (dbUser) {
           token.id = dbUser.id;
           token.role = dbUser.role;
+          token.jobTitle = dbUser.jobTitle ?? null;
           token.departmentId = dbUser.departmentId;
           token.teamId = dbUser.teamId ?? null;
           token.managerEmail = dbUser.managerEmail ?? null;
@@ -157,12 +178,24 @@ export const authOptions: NextAuthOptions = {
           token.location = dbUser.location ?? null;
           token.division = dbUser.division ?? null;
           token.loginId = authUser.loginId ?? null;
+          token.companyWideResults = hasCompanyWideResultsAccess({
+            role: dbUser.role,
+            email: dbUser.email,
+            jobTitle: dbUser.jobTitle,
+          });
+          token.canManageResults = canManageResultsRelease({
+            role: dbUser.role,
+            email: dbUser.email,
+          });
+          token.canViewResults =
+            token.companyWideResults || dbUser.role === "manager";
         }
-      } else if (!token.id && token.email) {
+      } else if (token.email) {
         const dbUser = await findUserByEmail(token.email);
         if (dbUser) {
           token.id = dbUser.id;
           token.role = isAdminEmail(dbUser.email) ? "admin" : dbUser.role;
+          token.jobTitle = dbUser.jobTitle;
           token.departmentId = dbUser.departmentId;
           token.teamId = dbUser.teamId;
           token.managerEmail = dbUser.managerEmail;
@@ -170,6 +203,17 @@ export const authOptions: NextAuthOptions = {
           token.location = dbUser.location;
           token.division = dbUser.division;
           token.loginId = null;
+          token.companyWideResults = hasCompanyWideResultsAccess({
+            role: token.role,
+            email: dbUser.email,
+            jobTitle: dbUser.jobTitle,
+          });
+          token.canManageResults = canManageResultsRelease({
+            role: token.role,
+            email: dbUser.email,
+          });
+          token.canViewResults =
+            token.companyWideResults || token.role === "manager";
         }
       }
       return token;
@@ -178,6 +222,7 @@ export const authOptions: NextAuthOptions = {
       if (session.user) {
         session.user.id = token.id ?? "";
         session.user.role = token.role ?? "employee";
+        session.user.jobTitle = token.jobTitle ?? null;
         session.user.departmentId = token.departmentId ?? "";
         session.user.teamId = token.teamId ?? null;
         session.user.managerEmail = token.managerEmail ?? null;
@@ -185,6 +230,9 @@ export const authOptions: NextAuthOptions = {
         session.user.location = token.location ?? null;
         session.user.division = token.division ?? null;
         session.user.loginId = token.loginId ?? null;
+        session.user.canViewResults = token.canViewResults ?? false;
+        session.user.canManageResults = token.canManageResults ?? false;
+        session.user.companyWideResults = token.companyWideResults ?? false;
       }
       return session;
     },

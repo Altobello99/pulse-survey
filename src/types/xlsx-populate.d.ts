@@ -9,6 +9,8 @@ declare module "xlsx-populate" {
     clear(): Range;
     value(values: unknown[][]): Range;
     style(name: string, value: unknown): Range;
+    style(styles: Record<string, unknown>): Range;
+    merged(value: boolean): Range;
   }
 
   export interface Row {
@@ -28,6 +30,7 @@ declare module "xlsx-populate" {
     row(index: number): Row;
     column(nameOrIndex: string | number): Column;
     delete(): Workbook;
+    usedRange(): Range;
   }
 
   export interface Workbook {
@@ -36,11 +39,13 @@ declare module "xlsx-populate" {
     cloneSheet(from: Sheet, name: string, indexOrBeforeSheet?: string | number | Sheet): Sheet;
     moveSheet(sheet: Sheet | string | number | undefined, indexOrBeforeSheet?: string | number | Sheet): Workbook;
     activeSheet(sheet: Sheet | string | number): Workbook;
+    addSheet(name: string): Sheet;
     outputAsync(type: "nodebuffer"): Promise<Buffer | Uint8Array | ArrayBuffer>;
   }
 
   const XlsxPopulate: {
     fromDataAsync(data: Buffer | Uint8Array | ArrayBuffer): Promise<Workbook>;
+    fromBlankAsync(): Promise<Workbook>;
   };
 
   export default XlsxPopulate;

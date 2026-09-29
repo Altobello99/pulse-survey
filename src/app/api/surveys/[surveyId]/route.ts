@@ -8,6 +8,7 @@ import {
   isOnSurveyOpeningRoster,
 } from "@/lib/access";
 import type { Prisma } from "@/generated/prisma/client";
+import { ensureSurveyRosterSnapshot } from "@/lib/results-roster";
 
 type SurveyQuestionInput = {
   text: string;
@@ -134,6 +135,10 @@ export async function PUT(
         options: q.options ? JSON.stringify(q.options) : null,
       })),
     });
+  }
+
+  if (survey.status === "active") {
+    await ensureSurveyRosterSnapshot(survey.id);
   }
 
   return Response.json({ data: survey });

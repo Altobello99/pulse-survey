@@ -70,24 +70,123 @@ model SurveyCompletion {
 }
 
 model Survey {
-  id                String              @id @default(cuid())
+  id                String                 @id @default(cuid())
   title             String
   description       String?
-  status            String              @default("draft")
+  status            String                 @default("draft")
   frequency         String?
   startDate         DateTime
   endDate           DateTime
-  publicToken       String?             @unique
-  allowAnonymous    Boolean             @default(false)
+  publicToken       String?                @unique
+  allowAnonymous    Boolean                @default(false)
   createdById       String
-  createdBy         User                @relation(fields: [createdById], references: [id])
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime            @updatedAt
+  createdBy         User                   @relation(fields: [createdById], references: [id])
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
   questions         Question[]
   responses         SurveyResponse[]
   completions       SurveyCompletion[]
   sentimentAnalyses SentimentAnalysis[]
   anonymousTokens   AnonymousToken[]
+  rosterSnapshots   SurveyRosterSnapshot[]
+  resultsRelease    SurveyResultsRelease?
+  resultComments    ResultCommentReview[]
+  resultInsights    ResultInsight[]
+  resultsAuditLogs  ResultsAuditLog[]
+}
+
+// Immutable eligibility and hierarchy context captured when a survey opens.
+// Historical reporting reads this table instead of the mutable BambooHR mirror.
+model SurveyRosterSnapshot {
+  id             String    @id @default(cuid())
+  surveyId       String
+  survey         Survey    @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+  userId         String?
+  email          String
+  departmentId   String
+  departmentName String
+  teamId         String?
+  teamName       String?
+  managerEmail   String?
+  jobTitle       String?
+  role           String?
+  location       String?
+  division       String?
+  hireDate       DateTime?
+  eligible       Boolean   @default(true)
+  capturedAt     DateTime  @default(now())
+
+  @@unique([surveyId, email])
+  @@index([surveyId, departmentId])
+  @@index([surveyId, managerEmail])
+  @@index([surveyId, location])
+}
+
+model SurveyResultsRelease {
+  id                 String    @id @default(cuid())
+  surveyId           String    @unique
+  survey             Survey    @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+  resultsReleasedAt  DateTime?
+  resultsReleasedBy  String?
+  insightsReleasedAt DateTime?
+  insightsReleasedBy String?
+  commentsReleasedAt DateTime?
+  commentsReleasedBy String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+}
+
+model ResultCommentReview {
+  id         String    @id @default(cuid())
+  surveyId   String
+  survey     Survey    @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+  answerId   String    @unique
+  status     String    @default("pending")
+  reviewedBy String?
+  reviewedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@index([surveyId, status])
+}
+
+model ResultInsight {
+  id          String    @id @default(cuid())
+  surveyId    String
+  survey      Survey    @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+  scopeKey    String
+  scopeLabel  String
+  insightKey  String
+  kind        String
+  title       String
+  body        String
+  severity    String
+  evidence    String
+  status      String    @default("pending")
+  sortOrder   Int       @default(0)
+  reviewedBy  String?
+  reviewedAt  DateTime?
+  generatedAt DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([surveyId, scopeKey, insightKey])
+  @@index([surveyId, scopeKey, status])
+}
+
+model ResultsAuditLog {
+  id         String   @id @default(cuid())
+  surveyId   String?
+  survey     Survey?  @relation(fields: [surveyId], references: [id], onDelete: SetNull)
+  actorId    String
+  actorEmail String
+  action     String
+  scopeKey   String?
+  format     String?
+  metadata   String?
+  createdAt  DateTime @default(now())
+
+  @@index([surveyId, createdAt])
+  @@index([actorEmail, createdAt])
 }
 
 // Tracks anonymous token use without linking to identity.
