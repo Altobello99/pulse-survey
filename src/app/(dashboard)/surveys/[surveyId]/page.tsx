@@ -154,7 +154,7 @@ export default function TakeSurveyPage({ params }: { params: Promise<{ surveyId:
               <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
             </svg>
           </div>
-          <h2 className="text-xl font-bold text-slate-900 mb-2">Thank you!</h2>
+          <h2 className="text-xl font-bold text-slate-900 mb-2">Thank You!</h2>
           <p className="text-slate-500 mb-6">
             You already submitted this survey. Your anonymous response has been recorded and cannot be submitted again.
           </p>
@@ -189,7 +189,7 @@ export default function TakeSurveyPage({ params }: { params: Promise<{ surveyId:
               <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
             </svg>
           </div>
-          <h2 className="text-xl font-bold text-slate-900 mb-2">Survey opens September 1</h2>
+          <h2 className="text-xl font-bold text-slate-900 mb-2">Survey Opens September 1</h2>
           <p className="text-slate-500 mb-6">
             This survey opens on September 1, 2026 at 12:00 a.m. Eastern Time. Please return then to share your feedback.
           </p>
@@ -213,7 +213,7 @@ export default function TakeSurveyPage({ params }: { params: Promise<{ surveyId:
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
           </div>
-          <h2 className="text-xl font-bold text-slate-900 mb-2">Survey closed</h2>
+          <h2 className="text-xl font-bold text-slate-900 mb-2">Survey Closed</h2>
           <p className="text-slate-500 mb-6">
             This survey is no longer accepting responses. Thank you for taking part in future pulse surveys.
           </p>
@@ -237,7 +237,7 @@ export default function TakeSurveyPage({ params }: { params: Promise<{ surveyId:
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M5.07 19h13.86a2 2 0 001.73-3L13.73 4a2 2 0 00-3.46 0L3.34 16a2 2 0 001.73 3z" />
             </svg>
           </div>
-          <h2 className="text-xl font-bold text-slate-900 mb-2">Not eligible for this survey</h2>
+          <h2 className="text-xl font-bold text-slate-900 mb-2">Not Eligible for This Survey</h2>
           <p className="text-slate-500 mb-6">
             {survey.eligibilityMessage ||
               "This survey is limited to employees who were active before it opened."}
@@ -291,7 +291,7 @@ export default function TakeSurveyPage({ params }: { params: Promise<{ surveyId:
               </svg>
             </div>
             <div>
-              <h3 className="font-semibold text-emerald-900 mb-1">Your feedback is anonymous</h3>
+              <h3 className="font-semibold text-emerald-900 mb-1">Your Feedback Is Anonymous</h3>
               <ul className="list-disc space-y-1 pl-5 text-sm text-emerald-800">
                 <li>Google sign-in confirms you are an active Clutch employee.</li>
                 <li>Each employee can submit only one response.</li>

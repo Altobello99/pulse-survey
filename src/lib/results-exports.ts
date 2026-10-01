@@ -172,19 +172,19 @@ export async function createResultsWorkbook(data: ResultsExportData) {
     "Anonymous Aggregate Data",
     [
       "Metric",
-      data.scope.type === "company" ? "Company-wide view" : "Direct reports",
-      "Company benchmark",
+      data.scope.type === "company" ? "Company-Wide View" : "Direct Reports",
+      "Company Benchmark",
       "Department reporting group",
     ],
     [
       ["Eligible employees", data.metrics.eligibleEmployees, "", ""],
       ["Completed", data.metrics.completions, "", ""],
       ["Participation", `${data.metrics.participationRate}%`, `${data.benchmarks.company.participationRate}%`, data.benchmarks.parent ? `${data.benchmarks.parent.participationRate}%` : "N/A"],
-      ["Average rating", displayScore(data.metrics.averageRating), displayScore(data.benchmarks.company.averageRating), data.benchmarks.parent ? displayScore(data.benchmarks.parent.averageRating) : "N/A"],
+      ["Average Rating", displayScore(data.metrics.averageRating), displayScore(data.benchmarks.company.averageRating), data.benchmarks.parent ? displayScore(data.benchmarks.parent.averageRating) : "N/A"],
       ["Favourable", displayPercent(data.metrics.favorablePercent), displayPercent(data.benchmarks.company.favorablePercent), data.benchmarks.parent ? displayPercent(data.benchmarks.parent.favorablePercent) : "N/A"],
-      ["Company-wide eNPS", data.metrics.enps ?? "N/A", data.metrics.enps ?? "N/A", "N/A"],
-      ["Best friend at work", displayPercent(data.metrics.friendYesPercent), "", ""],
-      ["Written comments", data.metrics.commentCount ?? "Protected", "", ""],
+      ["Company-Wide eNPS", data.metrics.enps ?? "N/A", data.metrics.enps ?? "N/A", "N/A"],
+      ["Best Friend at Work", displayPercent(data.metrics.friendYesPercent), "", ""],
+      ["Written Comments", data.metrics.commentCount ?? "Protected", "", ""],
     ],
     [34, 22, 22, 22]
   );
@@ -250,7 +250,7 @@ function buildDashboardSheet(sheet: Sheet, data: ResultsExportData) {
 
   const cards = [
     ["Participation", `${data.metrics.participationRate}%`, `${data.metrics.completions}/${data.metrics.eligibleEmployees} completed`],
-    ["Average rating", displayScore(data.metrics.averageRating), "out of 5"],
+    ["Average Rating", displayScore(data.metrics.averageRating), "out of 5"],
     ["Favourable", displayPercent(data.metrics.favorablePercent), "ratings of 4 or 5"],
     ["Company eNPS", data.metrics.enps ?? "N/A", "company-wide benchmark"],
   ];
@@ -267,15 +267,15 @@ function buildDashboardSheet(sheet: Sheet, data: ResultsExportData) {
     sheet.range(`${col(start)}9:${col(end)}9`).merged(true).value([[card[2]]]).style({ fontColor: COLORS.muted, fontSize: 9, horizontalAlignment: "center" });
   });
 
-  sheet.range("B12:F12").merged(true).value([["Highest scored"]]).style(sectionStyle(COLORS.tealDark));
-  sheet.range("G12:K12").merged(true).value([["Areas to watch"]]).style(sectionStyle(COLORS.amber));
+  sheet.range("B12:F12").merged(true).value([["Highest-Scoring Questions"]]).style(sectionStyle(COLORS.tealDark));
+  sheet.range("G12:K12").merged(true).value([["Areas to Watch"]]).style(sectionStyle(COLORS.amber));
   const standard = data.questions.filter((question) => !question.isEnps && question.average !== null);
   const strongest = [...standard].sort((a, b) => (b.average || 0) - (a.average || 0)).slice(0, 3);
   const weakest = [...standard].sort((a, b) => (a.average || 0) - (b.average || 0)).slice(0, 3);
   writeQuestionBlocks(sheet, strongest, 14, 2, 6, COLORS.teal);
   writeQuestionBlocks(sheet, weakest, 14, 7, 11, COLORS.amber);
 
-  sheet.range("B27:K27").merged(true).value([["AI-assisted highlights and areas to watch"]]).style(sectionStyle(COLORS.navy));
+  sheet.range("B27:K27").merged(true).value([["AI-Assisted Highlights and Areas to Watch"]]).style(sectionStyle(COLORS.navy));
   data.insights.slice(0, 4).forEach((insight, index) => {
     const row = 29 + index * 3;
     sheet.range(`B${row}:K${row}`).merged(true).value([[insight.title]]).style({ bold: true, fontColor: insight.severity === "critical" || insight.severity === "high" ? COLORS.red : COLORS.navy });
@@ -324,7 +324,7 @@ function addSummarySlide(pptx: PptxGenJS, data: ResultsExportData) {
   const recommendation = data.questions.find((question) => question.isEnps);
   const cards = [
     ["Participation", `${data.metrics.participationRate}%`, `${data.metrics.completions} of ${data.metrics.eligibleEmployees} completed`],
-    ["Average rating", displayScore(data.metrics.averageRating), "out of 5"],
+    ["Average Rating", displayScore(data.metrics.averageRating), "out of 5"],
     ["Favourable", displayPercent(data.metrics.favorablePercent), "ratings of 4 or 5"],
     ["Company eNPS", String(data.metrics.enps ?? "N/A"), recommendation?.average === null || recommendation?.average === undefined ? "company-wide benchmark" : `${recommendation.average} / 10 average rating`],
   ];
@@ -333,8 +333,8 @@ function addSummarySlide(pptx: PptxGenJS, data: ResultsExportData) {
   const standard = data.questions.filter((question) => !question.isEnps && question.average !== null);
   const strongest = [...standard].sort((a, b) => (b.average || 0) - (a.average || 0)).slice(0, 3);
   const weakest = [...standard].sort((a, b) => (a.average || 0) - (b.average || 0)).slice(0, 3);
-  addQuestionList(slide, 0.45, 3.35, 6.05, "Highest scored", strongest, COLORS.tealDark);
-  addQuestionList(slide, 6.82, 3.35, 6.05, "Lowest scored", weakest, COLORS.amber);
+  addQuestionList(slide, 0.45, 3.35, 6.05, "Highest-Scoring Questions", strongest, COLORS.tealDark);
+  addQuestionList(slide, 6.82, 3.35, 6.05, "Areas to Watch", weakest, COLORS.amber);
 }
 
 function addQuestionSlide(pptx: PptxGenJS, data: ResultsExportData) {
@@ -378,7 +378,7 @@ function addHierarchySlide(pptx: PptxGenJS, data: ResultsExportData) {
 function addThemesSlide(pptx: PptxGenJS, data: ResultsExportData) {
   const slide = pptx.addSlide();
   addSlideFrame(slide, "Themes and Sentiment", "Themes rank by severity first, then frequency");
-  slide.addText("Top themes", { x: 0.55, y: 1.25, w: 5.7, h: 0.35, fontSize: 17, bold: true, color: COLORS.navy, margin: 0 });
+  slide.addText("Top Themes", { x: 0.55, y: 1.25, w: 5.7, h: 0.35, fontSize: 17, bold: true, color: COLORS.navy, margin: 0 });
   const maxMentions = Math.max(1, ...data.themes.map((theme) => theme.mentions));
   data.themes.slice(0, 8).forEach((theme, index) => {
     const y = 1.78 + index * 0.58;
@@ -467,8 +467,8 @@ function addPdfSummary(pdf: PDFDocument, data: ResultsExportData, fonts: PdfFont
   ];
   cards.forEach((card, index) => pdfCard(page, fonts, 42 + index * 225, 365, 205, 95, card[0], card[1], card[2]));
   const standard = data.questions.filter((question) => !question.isEnps && question.average !== null);
-  pdfQuestionColumn(page, fonts, "Highest scored", [...standard].sort((a, b) => (b.average || 0) - (a.average || 0)).slice(0, 3), 42, 295, pdfRgb(COLORS.tealDark));
-  pdfQuestionColumn(page, fonts, "Areas to watch", [...standard].sort((a, b) => (a.average || 0) - (b.average || 0)).slice(0, 3), 505, 295, pdfRgb(COLORS.amber));
+  pdfQuestionColumn(page, fonts, "Highest-Scoring Questions", [...standard].sort((a, b) => (b.average || 0) - (a.average || 0)).slice(0, 3), 42, 295, pdfRgb(COLORS.tealDark));
+  pdfQuestionColumn(page, fonts, "Areas to Watch", [...standard].sort((a, b) => (a.average || 0) - (b.average || 0)).slice(0, 3), 505, 295, pdfRgb(COLORS.amber));
 }
 
 function addPdfQuestions(pdf: PDFDocument, data: ResultsExportData, fonts: PdfFonts) {

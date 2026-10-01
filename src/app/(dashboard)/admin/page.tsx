@@ -178,25 +178,25 @@ function ratingTone(average: number, minimum: number, maximum: number) {
 const ENPS_RANGES = [
   {
     range: "-100 to -1",
-    label: "Significant concern",
+    label: "Significant Concern",
     description: "There are more detractors than promoters. Prioritise listening and focused action.",
     color: "border-rose-500",
   },
   {
     range: "0 to 29",
-    label: "Room for improvement",
+    label: "Room for Improvement",
     description: "Advocacy is positive, with meaningful opportunities to improve the employee experience.",
     color: "border-amber-400",
   },
   {
     range: "30 to 69",
-    label: "Healthy advocacy",
+    label: "Healthy Advocacy",
     description: "Employees show strong advocacy and are generally willing to recommend the company.",
     color: "border-sky-500",
   },
   {
     range: "70 to 100",
-    label: "Exceptional advocacy",
+    label: "Exceptional Advocacy",
     description: "Employee advocacy is exceptionally strong, with relatively few detractors.",
     color: "border-emerald-500",
   },
@@ -632,7 +632,7 @@ export default function AdminDashboard() {
                 </optgroup>
               ))}
               {ungroupedDepartments.length > 0 && (
-                <optgroup label="Other departments">
+                <optgroup label="Other Departments">
                   {ungroupedDepartments.map((department) => (
                     <option key={department.id} value={department.id}>{department.name}</option>
                   ))}
@@ -816,7 +816,7 @@ export default function AdminDashboard() {
             <div className="border-t border-slate-200 px-6 py-6">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <h3 className="font-semibold text-slate-900">What is a good eNPS?</h3>
+                  <h3 className="font-semibold text-slate-900">What Is a Good eNPS?</h3>
                   <p className="mt-1 text-sm text-slate-500">
                     Use these ranges to interpret the calculated score from -100 to +100.
                   </p>
@@ -824,7 +824,7 @@ export default function AdminDashboard() {
                 {currentEnpsScore !== null && (
                   <div className="text-right">
                     <p className="text-sm font-semibold text-slate-900">
-                      Current range: {enpsRangeLabel(currentEnpsScore)}
+                      Current Range: {enpsRangeLabel(currentEnpsScore)}
                     </p>
                     <p className="text-xs text-slate-500">For the filters selected above</p>
                   </div>
@@ -842,10 +842,10 @@ export default function AdminDashboard() {
                     </div>
                   )}
                   <div className="flex h-5 overflow-hidden rounded-sm" aria-label="eNPS interpretation scale">
-                    <div className="w-1/2 bg-rose-500" title="Significant concern" />
-                    <div className="w-[15%] bg-amber-400" title="Room for improvement" />
-                    <div className="w-1/5 bg-sky-500" title="Healthy advocacy" />
-                    <div className="w-[15%] bg-emerald-500" title="Exceptional advocacy" />
+                    <div className="w-1/2 bg-rose-500" title="Significant Concern" />
+                    <div className="w-[15%] bg-amber-400" title="Room for Improvement" />
+                    <div className="w-1/5 bg-sky-500" title="Healthy Advocacy" />
+                    <div className="w-[15%] bg-emerald-500" title="Exceptional Advocacy" />
                   </div>
                   {enpsMarkerPosition !== null && (
                     <div
@@ -879,7 +879,7 @@ export default function AdminDashboard() {
             </div>
 
             <div className="border-t border-blue-200 bg-blue-50 px-6 py-5">
-              <h3 className="font-semibold text-blue-950">How the scores work</h3>
+              <h3 className="font-semibold text-blue-950">How the Scores Work</h3>
               <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-blue-900">
                 <li>Most rating questions use a 1-5 scale. Higher averages indicate a more favourable response.</li>
                 <li>The workplace recommendation question uses a 0-10 scale, so averages above 5 are expected and are displayed as a score out of 10.</li>

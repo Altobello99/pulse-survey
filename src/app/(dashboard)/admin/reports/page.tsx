@@ -80,7 +80,7 @@ export default function AdminReportsPage() {
 
       {!error && reportableSurveys.length === 0 && (
         <div className="bg-white rounded-xl border border-slate-200 p-10 text-center">
-          <h2 className="text-lg font-semibold text-slate-900">No survey reports</h2>
+          <h2 className="text-lg font-semibold text-slate-900">No Survey Reports</h2>
           <p className="mt-1 text-sm text-slate-500">
             Reports appear here after a survey is opened and remain available when it closes.
           </p>

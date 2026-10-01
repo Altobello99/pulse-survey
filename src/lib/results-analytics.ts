@@ -377,7 +377,7 @@ export async function buildResultsData(
             text: sanitizeAnonymousComment(answer.textValue, names),
             question: question?.text || "Written response",
             department: departmentNameForId(allRoster, answer.response.departmentId),
-            location: answer.response.location || "Location not listed",
+            location: answer.response.location || "Location Not Listed",
             sentiment: analysis?.sentiment || "pending",
             severity: analysis?.severity || "pending",
             themes: parseCommentThemes(analysis?.themes),
@@ -454,10 +454,10 @@ export async function buildResultsData(
       ...metrics,
       enps: companyMetrics.enps,
       enpsResponses: companyMetrics.enpsResponses,
-      enpsLabel: "Company-wide eNPS",
+      enpsLabel: "Company-Wide eNPS",
     },
     benchmarks: {
-      company: benchmarkFromMetrics("Company-wide", companyMetrics),
+      company: benchmarkFromMetrics("Company-Wide", companyMetrics),
       parent: parentBenchmark,
     },
     questions: reportable ? metrics.questions : metrics.questions.map(protectQuestion),
@@ -933,7 +933,7 @@ function buildHierarchyRows(input: {
       id: `department:${key}`,
       type: "department" as const,
       department: first.departmentName,
-      location: first.location || "Location not listed",
+      location: first.location || "Location Not Listed",
       label: `${first.departmentName}, ${shortLocation(first.location)}`,
       ...compactMetrics(buildMetrics(input.questions, groupResponses, members.length, completed)),
     };
@@ -962,7 +962,7 @@ function buildHierarchyRows(input: {
         id: `production:${location}`,
         type: "combined" as const,
         department: "Production Total",
-        location: location || "Location not listed",
+        location: location || "Location Not Listed",
         label: `Production Total, ${shortLocation(location)}`,
         ...compactMetrics(buildMetrics(input.questions, groupResponses, members.length, completed)),
       });
@@ -1009,10 +1009,10 @@ function buildComparisonData(input: {
       type: "selected",
       label:
         input.scope === "leadership"
-          ? "Direct leadership team"
+          ? "Direct Leadership Team"
           : input.scope === "company"
-            ? "Filtered company view"
-            : "Direct reports",
+            ? "Filtered Company View"
+            : "Direct Reports",
       detail: input.scopeLabel,
       ...comparisonMetrics(input.selectedMetrics),
     });
@@ -1021,7 +1021,7 @@ function buildComparisonData(input: {
   groups.push({
     id: "company",
     type: "company",
-    label: "Company-wide",
+    label: "Company-Wide",
     detail: "All eligible employees and survey responses",
     ...comparisonMetrics(input.companyMetrics),
   });
@@ -1042,7 +1042,7 @@ function buildComparisonData(input: {
       id: row.id,
       type: row.type,
       label: row.label,
-      detail: row.type === "combined" ? "Combined department group" : "Department by site",
+      detail: row.type === "combined" ? "Combined Department Group" : "Department by Site",
       eligibleEmployees: row.eligibleEmployees,
       completions: row.completions,
       participationRate: row.participationRate,
@@ -1102,7 +1102,7 @@ function buildReportingGroupComparisons(input: {
         id: `reporting:${createHash("sha256").update(leader.email).digest("hex").slice(0, 12)}`,
         type: "reporting_group",
         label: reportingGroupLabel(roster),
-        detail: "Direct reporting organisation",
+        detail: "Direct Reporting Organisation",
         ...comparisonMetrics(metrics),
       },
     ];
@@ -1300,7 +1300,7 @@ function buildInsightCandidates(input: {
     insights.push({
       insightKey: "highest-question",
       kind: "highlight",
-      title: "Highest-rated experience",
+      title: "Highest-Rated Experience",
       body: `${highest.question} is the highest-rated item for this reporting group at ${highest.average} out of 5 (${highest.favorablePercent}% favourable).`,
       severity: "positive",
       evidence: JSON.stringify({ questionId: highest.id, average: highest.average }),
@@ -1311,7 +1311,7 @@ function buildInsightCandidates(input: {
     insights.push({
       insightKey: "lowest-question",
       kind: "watch",
-      title: "Primary area to watch",
+      title: "Primary Area to Watch",
       body: `${lowest.question} is the lowest-rated item at ${lowest.average} out of 5 (${lowest.favorablePercent}% favourable).`,
       severity: (lowest.average || 0) < 3.5 ? "high" : "medium",
       evidence: JSON.stringify({ questionId: lowest.id, average: lowest.average }),
@@ -1322,7 +1322,7 @@ function buildInsightCandidates(input: {
     insights.push({
       insightKey: "group-spread",
       kind: "comparison",
-      title: "Largest result spread",
+      title: "Largest Result Spread",
       body: `${strongest.label} is highest at ${strongest.averageRating} out of 5, while ${weakest.label} is lowest at ${weakest.averageRating}.`,
       severity: "medium",
       evidence: JSON.stringify({ strongest: strongest.id, weakest: weakest.id }),
@@ -1334,7 +1334,7 @@ function buildInsightCandidates(input: {
     insights.push({
       insightKey: "leading-theme",
       kind: "theme",
-      title: `${leadingTheme.theme} is the leading comment theme`,
+      title: `${leadingTheme.theme} Is the Leading Comment Theme`,
       body: `${leadingTheme.mentions} comment${leadingTheme.mentions === 1 ? "" : "s"} mention this theme. It ranks first based on severity and frequency.`,
       severity,
       evidence: JSON.stringify(leadingTheme),
@@ -1385,7 +1385,7 @@ function buildScopeLabel(
   roster: Snapshot[],
   filters: ReturnType<typeof normalizeFilters>
 ) {
-  if (scope === "company" && !hasFilters(filters)) return "Company-wide";
+  if (scope === "company" && !hasFilters(filters)) return "Company-Wide";
   const departments = unique(roster.map((employee) => employee.departmentName));
   const locations = unique(roster.map((employee) => shortLocation(employee.location)));
   const parts = [
@@ -1393,9 +1393,9 @@ function buildScopeLabel(
     locations.length === 1 ? locations[0] : locations.length > 1 ? `${locations.length} Locations` : null,
   ].filter(Boolean);
   if (parts.length) return `Team Results: ${parts.join(", ")}`;
-  if (scope === "leadership") return "Direct leadership team";
-  if (scope === "direct") return "Direct reports";
-  return "My organisation";
+  if (scope === "leadership") return "Direct Leadership Team";
+  if (scope === "direct") return "Direct Reports";
+  return "My Organisation";
 }
 
 function hasFilters(filters: ReturnType<typeof normalizeFilters>) {
@@ -1416,11 +1416,11 @@ function scopeOptions(
     (employee) => employee.role === "manager" || leaderEmails.has(employee.email)
   );
   return [
-    ...(companyWide ? [{ value: "company", label: "Company-wide" }] : []),
-    { value: "organization", label: "My organisation" },
-    { value: "direct", label: "Direct reports" },
+    ...(companyWide ? [{ value: "company", label: "Company-Wide" }] : []),
+    { value: "organization", label: "My Organisation" },
+    { value: "direct", label: "Direct Reports" },
     ...(hasLeadership
-      ? [{ value: "leadership", label: "Direct leadership team" }]
+      ? [{ value: "leadership", label: "Direct Leadership Team" }]
       : []),
   ];
 }
@@ -1430,7 +1430,7 @@ function buildFilterOptions(roster: Snapshot[]) {
   const teams = new Map<string, string>();
   for (const employee of roster) {
     departments.set(employee.departmentId, employee.departmentName);
-    if (employee.teamId) teams.set(employee.teamId, employee.teamName || "Team not listed");
+    if (employee.teamId) teams.set(employee.teamId, employee.teamName || "Team Not Listed");
   }
   return {
     departments: [...departments.entries()]
@@ -1522,7 +1522,7 @@ function percentage<T>(values: T[], predicate: (value: T) => boolean) {
 }
 
 function shortLocation(location: string | null) {
-  if (!location) return "Location not listed";
+  if (!location) return "Location Not Listed";
   return location.replace(/^\d+\s+/, "").split(/\s+[\u2013\u2014-]\s+/)[0].trim() || location;
 }
 

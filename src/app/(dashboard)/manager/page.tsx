@@ -256,7 +256,7 @@ export default function ManagerDashboard() {
 
       {data.suppressed ? (
         <section className="rounded-lg border border-slate-200 bg-white p-8 text-center">
-          <h2 className="text-lg font-semibold text-slate-900">Team results are protected</h2>
+          <h2 className="text-lg font-semibold text-slate-900">Team Results Are Protected</h2>
           <p className="mx-auto mt-2 max-w-xl text-sm text-slate-500">
             {data.suppressionMessage} Participation remains visible so you can track completion without exposing anyone&apos;s answers.
           </p>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, use } from "react";
+import Image from "next/image";
 
 interface Question {
   id: string;
@@ -26,9 +27,11 @@ function getFingerprint(): string {
   let fp = typeof window !== "undefined" ? localStorage.getItem(KEY) : null;
   if (!fp) {
     const arr = new Uint8Array(16);
-    (typeof crypto !== "undefined" && crypto.getRandomValues)
-      ? crypto.getRandomValues(arr)
-      : arr.forEach((_, i) => (arr[i] = Math.floor(Math.random() * 256)));
+    if (typeof crypto !== "undefined" && crypto.getRandomValues) {
+      crypto.getRandomValues(arr);
+    } else {
+      arr.forEach((_, i) => (arr[i] = Math.floor(Math.random() * 256)));
+    }
     fp = Array.from(arr, (b) => b.toString(16).padStart(2, "0")).join("");
     if (typeof window !== "undefined") localStorage.setItem(KEY, fp);
   }
@@ -42,7 +45,7 @@ export default function PublicSurveyPage({
 }) {
   const { token } = use(params);
   const [survey, setSurvey] = useState<Survey | null>(null);
-  const [answers, setAnswers] = useState<Record<string, any>>({});
+  const [answers, setAnswers] = useState<Record<string, string | number>>({});
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -110,7 +113,7 @@ export default function PublicSurveyPage({
               <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
             </svg>
           </div>
-          <h2 className="text-xl font-bold text-slate-900 mb-2">Thank you!</h2>
+          <h2 className="text-xl font-bold text-slate-900 mb-2">Thank You!</h2>
           <p className="text-slate-500">
             Your anonymous response has been recorded. Your feedback helps make our workplace better.
           </p>
@@ -127,7 +130,7 @@ export default function PublicSurveyPage({
     <div className="min-h-screen bg-gradient-to-br from-teal-50 to-blue-50 p-4 py-8">
       <div className="max-w-2xl mx-auto">
         <div className="text-center mb-6">
-          <img src="/logo.svg" alt="Employee Pulse Survey" className="inline-block w-12 h-12 mb-2" />
+          <Image src="/logo.svg" alt="Employee Pulse Survey" width={48} height={48} className="mb-2 inline-block" />
           <p className="text-sm text-slate-500">Employee Pulse Survey</p>
         </div>
 

@@ -306,7 +306,7 @@ function LeaderReport({ surveyId, rows }: { surveyId: string; rows: LeaderRow[] 
         <div className="mt-6 border-t border-slate-200 pt-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <h4 className="font-semibold text-slate-900">Question ratings for {selectedLeader.name}</h4>
+              <h4 className="font-semibold text-slate-900">Question Ratings for {selectedLeader.name}</h4>
               <p className="mt-1 text-sm text-slate-500">Actual average for each scored question in this leader group.</p>
             </div>
             <FilterSelect label="Leader" value={selectedLeader.id} onChange={setSelectedLeaderId} compact>
@@ -330,7 +330,7 @@ function QuestionAverageReport({ surveyId, rows }: { surveyId: string; rows: Que
   return (
     <div>
       <ReportHeading
-        title="Company-wide Question Averages"
+        title="Company-Wide Question Averages"
         description="The actual mean score for every rating question. The recommendation question shows both its average out of 10 and the separately calculated eNPS."
         surveyId={surveyId}
         reportType="company-question-averages"
