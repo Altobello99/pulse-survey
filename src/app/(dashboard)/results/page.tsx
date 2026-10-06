@@ -70,6 +70,8 @@ type HierarchyRow = {
   participationRate: number;
   averageRating: number | null;
   favorablePercent: number | null;
+  enps: number | null;
+  enpsResponses: number | null;
   suppressed: boolean;
   questions: QuestionResult[];
 };
@@ -84,6 +86,8 @@ type ComparisonGroup = {
   participationRate: number;
   averageRating: number | null;
   favorablePercent: number | null;
+  enps: number | null;
+  enpsResponses: number | null;
   suppressed: boolean;
   questions: QuestionResult[];
 };
@@ -197,6 +201,8 @@ type Benchmark = {
   participationRate: number;
   averageRating: number | null;
   favorablePercent: number | null;
+  enps: number | null;
+  enpsResponses: number | null;
 };
 
 type LockedData = {
@@ -519,9 +525,13 @@ function KpiGrid({ data }: { data: ResultsData }) {
       tone: "text-emerald-600",
     },
     {
-      label: "Company-Wide eNPS",
-      value: data.metrics.enps === null ? "N/A" : signed(data.metrics.enps),
-      detail: `${data.metrics.enpsResponses ?? 0} company-wide responses`,
+      label: data.metrics.enpsLabel,
+      value: data.metrics.enps === null
+        ? (data.metrics.enpsResponses ?? 0) < data.anonymityThreshold ? "Protected" : "N/A"
+        : signed(data.metrics.enps),
+      detail: data.metrics.enps === null && (data.metrics.enpsResponses ?? 0) < data.anonymityThreshold
+        ? `Protected: fewer than ${data.anonymityThreshold} responses`
+        : `${data.metrics.enpsResponses ?? 0} ${data.metrics.enpsLabel === "Company-Wide eNPS" ? "company-wide responses" : "responses in selected scope"}`,
       icon: Target,
       tone: enpsTone(data.metrics.enps),
     },
@@ -569,7 +579,7 @@ function SummaryView({ data, onRefresh }: { data: ResultsData; onRefresh: () => 
         <QuestionSummary title="Highest-Scoring Questions" questions={highest} tone="positive" />
         <QuestionSummary title="Areas to Watch" questions={lowest} tone="watch" />
       </div>
-      <EnpsGuide score={data.metrics.enps} />
+      <EnpsGuide score={data.metrics.enps} label={data.metrics.enpsLabel} />
       <InsightPanel data={data} onRefresh={onRefresh} />
     </div>
   );
@@ -581,12 +591,14 @@ function BenchmarkStrip({ data }: { data: ResultsData }) {
     participationRate: data.metrics.participationRate,
     averageRating: data.metrics.averageRating,
     favorablePercent: data.metrics.favorablePercent,
+    enps: data.metrics.enps,
   };
   const benchmarks = [selected, data.benchmarks.parent, data.benchmarks.company].filter(Boolean) as Array<{
     label: string;
     participationRate: number;
     averageRating: number | null;
     favorablePercent: number | null;
+    enps: number | null;
   }>;
   return (
     <section>
@@ -595,10 +607,11 @@ function BenchmarkStrip({ data }: { data: ResultsData }) {
         {benchmarks.map((benchmark) => (
           <div key={benchmark.label} className="bg-white p-4">
             <div className="text-xs font-semibold uppercase text-slate-500">{benchmark.label}</div>
-            <div className="mt-3 grid grid-cols-3 gap-3 text-center">
+            <div className="mt-3 grid grid-cols-4 gap-3 text-center">
               <MiniMetric label="Participation" value={`${benchmark.participationRate}%`} />
               <MiniMetric label="Average" value={benchmark.averageRating === null ? "N/A" : `${benchmark.averageRating}/5`} />
               <MiniMetric label="Favourable" value={displayPercent(benchmark.favorablePercent)} />
+              <MiniMetric label="eNPS" value={benchmark.enps === null ? "N/A" : signed(benchmark.enps)} />
             </div>
           </div>
         ))}
@@ -628,7 +641,7 @@ function QuestionSummary({ title, questions, tone }: { title: string; questions:
   );
 }
 
-function EnpsGuide({ score }: { score: number | null }) {
+function EnpsGuide({ score, label }: { score: number | null; label: string }) {
   const position = score === null ? 50 : Math.max(2, Math.min(98, (score + 100) / 2));
   const bandWidths = "50fr 15fr 20fr 15fr";
   const bands = [
@@ -640,7 +653,7 @@ function EnpsGuide({ score }: { score: number | null }) {
   return (
     <section className="border-y border-slate-200 bg-white py-5">
       <div className="px-4 sm:px-5">
-        <SectionHeading title="What the Company-Wide eNPS Means" detail="eNPS is the percentage of promoters minus the percentage of detractors, on a scale from -100 to +100." />
+        <SectionHeading title={`What ${label} Means`} detail="eNPS is the percentage of promoters minus the percentage of detractors, on a scale from -100 to +100." />
         <div className="relative mt-7">
           {score !== null && (
             <div className="absolute -top-7 -translate-x-1/2 text-center" style={{ left: `${position}%` }}>
@@ -852,10 +865,11 @@ function ComparisonView({ data }: { data: ResultsData }) {
                   </div>
                   {group.suppressed && <LockKeyhole className="h-4 w-4 shrink-0 text-slate-400" />}
                 </div>
-                <div className="mt-4 grid grid-cols-3 gap-1 border-t border-slate-100 pt-3 text-center sm:gap-2">
+                <div className="mt-4 grid grid-cols-4 gap-1 border-t border-slate-100 pt-3 text-center sm:gap-2">
                   <MiniMetric label="Participation" value={`${group.participationRate}%`} />
                   <MiniMetric label="Completed" value={`${group.completions}/${group.eligibleEmployees}`} />
                   <MiniMetric label="Average" value={group.averageRating === null ? "Protected" : `${group.averageRating}/5`} />
+                  <MiniMetric label="eNPS" value={group.enps === null ? "Protected" : signed(group.enps)} />
                 </div>
               </article>
             ))}
@@ -1077,7 +1091,7 @@ function HierarchyView({ rows }: { rows: HierarchyRow[] }) {
         </div>
       </div>
       <div className="mt-4 overflow-x-auto border-y border-slate-200 bg-white">
-        <table className="w-full min-w-[900px] text-left text-sm">
+        <table className="w-full min-w-[1040px] text-left text-sm">
           <thead className="bg-slate-50 text-xs uppercase text-slate-500">
             <tr>
               <th className="px-4 py-3 font-semibold">Department / site</th>
@@ -1086,6 +1100,7 @@ function HierarchyView({ rows }: { rows: HierarchyRow[] }) {
               <th className="px-4 py-3 font-semibold">Participation</th>
               <th className="px-4 py-3 font-semibold">Average (out of 5)</th>
               <th className="px-4 py-3 font-semibold">Favourable</th>
+              <th className="px-4 py-3 font-semibold">eNPS</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -1097,6 +1112,7 @@ function HierarchyView({ rows }: { rows: HierarchyRow[] }) {
                 <td className="px-4 py-3.5"><Progress value={row.participationRate} label={`${row.participationRate}%`} /></td>
                 <td className={`px-4 py-3.5 font-bold ${scoreText(row.averageRating)}`}>{row.averageRating === null ? <ProtectedInline /> : `${row.averageRating} / 5`}</td>
                 <td className="px-4 py-3.5 text-slate-700">{row.favorablePercent === null ? "N/A" : `${row.favorablePercent}%`}</td>
+                <td className={`px-4 py-3.5 font-bold ${enpsTone(row.enps)}`}>{row.enps === null ? <ProtectedInline /> : signed(row.enps)}</td>
               </tr>
             ))}
           </tbody>
@@ -1154,7 +1170,7 @@ function QuestionsView({ questions, suppressed }: { questions: QuestionResult[];
                 )}
               </div>
               <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
-                {question.isEnps ? <span>Average rating, separate from company-wide eNPS</span> : <><span className="text-emerald-700">{question.favorablePercent}% favourable</span><span>{question.neutralPercent}% neutral</span><span className="text-red-700">{question.unfavorablePercent}% unfavourable</span></>}
+                {question.isEnps ? <span>Average rating, separate from the selected scope&apos;s eNPS</span> : <><span className="text-emerald-700">{question.favorablePercent}% favourable</span><span>{question.neutralPercent}% neutral</span><span className="text-red-700">{question.unfavorablePercent}% unfavourable</span></>}
                 <span className="ml-auto">{question.responses} responses</span>
               </div>
             </article>

@@ -297,6 +297,8 @@ export async function buildResultsData(
     selectedRoster.length,
     selectedCompletions
   );
+  const scopeLabel = buildScopeLabel(scope, selectedRoster, normalizedFilters);
+  const companyWideScope = scope === "company" && !hasFilters(normalizedFilters);
 
   const companyRoster = allRoster;
   const companyCompletionCount = companyRoster.filter(
@@ -333,7 +335,7 @@ export async function buildResultsData(
     completionIds,
     effectiveEmail,
     scope,
-    scopeLabel: buildScopeLabel(scope, selectedRoster, normalizedFilters),
+    scopeLabel,
     filters: normalizedFilters,
   });
   const textAnswers = scopedResponses.flatMap((response) =>
@@ -394,7 +396,6 @@ export async function buildResultsData(
     scope,
     filters: normalizedFilters,
   });
-  const scopeLabel = buildScopeLabel(scope, selectedRoster, normalizedFilters);
   const generatedInsights = buildInsightCandidates({
     metrics,
     hierarchyRows,
@@ -460,9 +461,7 @@ export async function buildResultsData(
     },
     metrics: {
       ...metrics,
-      enps: companyMetrics.enps,
-      enpsResponses: companyMetrics.enpsResponses,
-      enpsLabel: "Company-Wide eNPS",
+      enpsLabel: companyWideScope ? "Company-Wide eNPS" : "Team eNPS",
     },
     benchmarks: {
       company: benchmarkFromMetrics("Company-Wide", companyMetrics),
@@ -831,6 +830,7 @@ function buildMetrics(
   const enpsRatings = recommendation
     ? ratingsForQuestion(responses, recommendation.id)
     : [];
+  const enpsReportable = reportable && isReportableGroup(enpsRatings.length);
   const friendQuestion = questions.find(
     (question) => question.type === "multiple_choice" && /best friend/i.test(question.text)
   );
@@ -863,7 +863,7 @@ function buildMetrics(
         ? percentage(friendChoices, (choice) => choice === "yes")
         : null,
     commentCount: reportable ? textAnswers.length : null,
-    enps: reportable && enpsRatings.length ? calculateEnps(enpsRatings) : null,
+    enps: enpsReportable ? calculateEnps(enpsRatings) : null,
     enpsResponses: reportable ? enpsRatings.length : null,
     questions: questions
       .filter((question) => question.type === "rating")
@@ -990,6 +990,8 @@ function compactMetrics(metrics: MetricSet) {
     participationRate: metrics.participationRate,
     averageRating: metrics.averageRating,
     favorablePercent: metrics.favorablePercent,
+    enps: metrics.enps,
+    enpsResponses: metrics.enpsResponses,
     suppressed: metrics.suppressed,
     questions: metrics.questions,
   };
@@ -1056,6 +1058,8 @@ function buildComparisonData(input: {
       participationRate: row.participationRate,
       averageRating: row.averageRating,
       favorablePercent: row.favorablePercent,
+      enps: row.enps,
+      enpsResponses: row.enpsResponses,
       suppressed: row.suppressed,
       questions: row.questions,
     }))
@@ -1137,6 +1141,8 @@ function comparisonMetrics(metrics: MetricSet) {
     participationRate: metrics.participationRate,
     averageRating: metrics.averageRating,
     favorablePercent: metrics.favorablePercent,
+    enps: metrics.enps,
+    enpsResponses: metrics.enpsResponses,
     suppressed: metrics.suppressed,
     questions: metrics.questions,
   };
@@ -1205,6 +1211,8 @@ function benchmarkFromMetrics(label: string, metrics: MetricSet) {
     participationRate: metrics.participationRate,
     averageRating: metrics.averageRating,
     favorablePercent: metrics.favorablePercent,
+    enps: metrics.enps,
+    enpsResponses: metrics.enpsResponses,
   };
 }
 

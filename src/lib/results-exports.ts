@@ -36,10 +36,12 @@ export type ResultsExportData = {
     friendYesPercent: number | null;
     commentCount: number | null;
     enps: number | null;
+    enpsResponses: number | null;
+    enpsLabel: string;
   };
   benchmarks: {
-    company: { participationRate: number; averageRating: number | null; favorablePercent: number | null };
-    parent: { participationRate: number; averageRating: number | null; favorablePercent: number | null } | null;
+    company: { participationRate: number; averageRating: number | null; favorablePercent: number | null; enps: number | null };
+    parent: { participationRate: number; averageRating: number | null; favorablePercent: number | null; enps: number | null } | null;
   };
   questions: Array<{
     order: number;
@@ -59,6 +61,7 @@ export type ResultsExportData = {
     participationRate: number;
     averageRating: number | null;
     favorablePercent: number | null;
+    enps: number | null;
     suppressed: boolean;
   }>;
   themes: Array<{
@@ -120,7 +123,7 @@ export async function createResultsWorkbook(data: ResultsExportData) {
   writeTableSheet(
     hierarchy,
     "Department and Location Comparison",
-    ["Team result", "Eligible", "Completed", "Participation", "Average", "Favourable", "Privacy"],
+    ["Team result", "Eligible", "Completed", "Participation", "Average", "Favourable", "eNPS", "Privacy"],
     data.hierarchy.map((row) => [
       row.label,
       row.eligibleEmployees,
@@ -128,9 +131,10 @@ export async function createResultsWorkbook(data: ResultsExportData) {
       `${row.participationRate}%`,
       row.averageRating ?? "Protected",
       row.favorablePercent === null ? "Protected" : `${row.favorablePercent}%`,
+      row.enps ?? "Protected",
       row.suppressed ? "Fewer than 3 completions" : "Reportable",
     ]),
-    [44, 12, 14, 16, 14, 14, 24]
+    [44, 12, 14, 16, 14, 14, 12, 24]
   );
 
   const themes = workbook.addSheet("Themes");
@@ -182,7 +186,7 @@ export async function createResultsWorkbook(data: ResultsExportData) {
       ["Participation", `${data.metrics.participationRate}%`, `${data.benchmarks.company.participationRate}%`, data.benchmarks.parent ? `${data.benchmarks.parent.participationRate}%` : "N/A"],
       ["Average Rating", displayScore(data.metrics.averageRating), displayScore(data.benchmarks.company.averageRating), data.benchmarks.parent ? displayScore(data.benchmarks.parent.averageRating) : "N/A"],
       ["Favourable", displayPercent(data.metrics.favorablePercent), displayPercent(data.benchmarks.company.favorablePercent), data.benchmarks.parent ? displayPercent(data.benchmarks.parent.favorablePercent) : "N/A"],
-      ["Company-Wide eNPS", data.metrics.enps ?? "N/A", data.metrics.enps ?? "N/A", "N/A"],
+      [data.metrics.enpsLabel, data.metrics.enps ?? "Protected", data.benchmarks.company.enps ?? "Protected", data.benchmarks.parent?.enps ?? "N/A"],
       ["Best Friend at Work", displayPercent(data.metrics.friendYesPercent), "", ""],
       ["Written Comments", data.metrics.commentCount ?? "Protected", "", ""],
     ],
@@ -252,7 +256,7 @@ function buildDashboardSheet(sheet: Sheet, data: ResultsExportData) {
     ["Participation", `${data.metrics.participationRate}%`, `${data.metrics.completions}/${data.metrics.eligibleEmployees} completed`],
     ["Average Rating", displayScore(data.metrics.averageRating), "out of 5"],
     ["Favourable", displayPercent(data.metrics.favorablePercent), "ratings of 4 or 5"],
-    ["Company eNPS", data.metrics.enps ?? "N/A", "company-wide benchmark"],
+    [data.metrics.enpsLabel, data.metrics.enps ?? "Protected", `${data.metrics.enpsResponses ?? 0} responses`],
   ];
   cards.forEach((card, index) => {
     const start = 2 + index * 2 + (index >= 2 ? 1 : 0);
@@ -326,7 +330,7 @@ function addSummarySlide(pptx: PptxGenJS, data: ResultsExportData) {
     ["Participation", `${data.metrics.participationRate}%`, `${data.metrics.completions} of ${data.metrics.eligibleEmployees} completed`],
     ["Average Rating", displayScore(data.metrics.averageRating), "out of 5"],
     ["Favourable", displayPercent(data.metrics.favorablePercent), "ratings of 4 or 5"],
-    ["Company eNPS", String(data.metrics.enps ?? "N/A"), recommendation?.average === null || recommendation?.average === undefined ? "company-wide benchmark" : `${recommendation.average} / 10 average rating`],
+    [data.metrics.enpsLabel, String(data.metrics.enps ?? "Protected"), recommendation?.average === null || recommendation?.average === undefined ? `${data.metrics.enpsResponses ?? 0} responses` : `${recommendation.average} / 10 average rating`],
   ];
   cards.forEach((card, index) => addPptCard(slide, 0.45 + index * 3.18, 1.65, 2.82, 1.2, card[0], card[1], card[2]));
 
@@ -356,7 +360,7 @@ function addQuestionSlide(pptx: PptxGenJS, data: ResultsExportData) {
   const recommendation = data.questions.find((question) => question.isEnps);
   if (recommendation) {
     slide.addText("Recommendation question", { x: 0.55, y: 6.92, w: 2.1, h: 0.18, fontSize: 9, bold: true, color: COLORS.slate, margin: 0 });
-    slide.addText(`${recommendation.average ?? "Protected"} / 10 average | Company eNPS ${data.metrics.enps ?? "N/A"}`, { x: 2.55, y: 6.9, w: 5.4, h: 0.2, fontSize: 9.5, color: COLORS.blue, margin: 0 });
+    slide.addText(`${recommendation.average ?? "Protected"} / 10 average | ${data.metrics.enpsLabel} ${data.metrics.enps ?? "Protected"}`, { x: 2.55, y: 6.9, w: 6.4, h: 0.2, fontSize: 9.5, color: COLORS.blue, margin: 0 });
   }
 }
 
@@ -372,6 +376,7 @@ function addHierarchySlide(pptx: PptxGenJS, data: ResultsExportData) {
     slide.addText(`${row.participationRate}%`, { x: 7.1, y, w: 0.8, h: 0.24, fontSize: 11, color: COLORS.tealDark, bold: true, align: "right", margin: 0 });
     slide.addText(row.averageRating === null ? "Protected" : `${row.averageRating} / 5`, { x: 8.25, y, w: 1.25, h: 0.24, fontSize: 11, color: scoreColour(row.averageRating), bold: true, align: "right", margin: 0 });
     slide.addText(row.favorablePercent === null ? "" : `${row.favorablePercent}% favourable`, { x: 9.75, y, w: 1.35, h: 0.24, fontSize: 10, color: COLORS.slate, align: "right", margin: 0 });
+    slide.addText(row.enps === null ? "Protected" : `eNPS ${formatSigned(row.enps)}`, { x: 11.25, y, w: 1.4, h: 0.24, fontSize: 10, color: COLORS.blue, bold: true, align: "right", margin: 0 });
   });
 }
 
@@ -463,7 +468,7 @@ function addPdfSummary(pdf: PDFDocument, data: ResultsExportData, fonts: PdfFont
     ["Participation", `${data.metrics.participationRate}%`, `${data.metrics.completions}/${data.metrics.eligibleEmployees} completed`],
     ["Average", displayScore(data.metrics.averageRating), "out of 5"],
     ["Favourable", displayPercent(data.metrics.favorablePercent), "ratings of 4 or 5"],
-    ["Company eNPS", String(data.metrics.enps ?? "N/A"), recommendation?.average === null || recommendation?.average === undefined ? "company-wide" : `${recommendation.average}/10 average`],
+    [data.metrics.enpsLabel, String(data.metrics.enps ?? "Protected"), recommendation?.average === null || recommendation?.average === undefined ? `${data.metrics.enpsResponses ?? 0} responses` : `${recommendation.average}/10 average`],
   ];
   cards.forEach((card, index) => pdfCard(page, fonts, 42 + index * 225, 365, 205, 95, card[0], card[1], card[2]));
   const standard = data.questions.filter((question) => !question.isEnps && question.average !== null);
@@ -486,7 +491,7 @@ function addPdfQuestions(pdf: PDFDocument, data: ResultsExportData, fonts: PdfFo
   });
   const recommendation = data.questions.find((question) => question.isEnps);
   if (recommendation) {
-    page.drawText(pdfText(`Recommendation question: ${recommendation.average ?? "Protected"}/10 average | Company eNPS ${data.metrics.enps ?? "N/A"}`), { x: 42, y: 24, size: 9, font: fonts.bold, color: pdfRgb(COLORS.blue) });
+    page.drawText(pdfText(`Recommendation question: ${recommendation.average ?? "Protected"}/10 average | ${data.metrics.enpsLabel} ${data.metrics.enps ?? "Protected"}`), { x: 42, y: 24, size: 9, font: fonts.bold, color: pdfRgb(COLORS.blue) });
   }
 }
 
@@ -501,6 +506,7 @@ function addPdfHierarchy(pdf: PDFDocument, data: ResultsExportData, fonts: PdfFo
     page.drawText(`${row.participationRate}%`, { x: 630, y, size: 9.5, font: fonts.bold, color: pdfRgb(COLORS.tealDark) });
     page.drawText(row.averageRating === null ? "Protected" : `${row.averageRating} / 5`, { x: 720, y, size: 9.5, font: fonts.bold, color: pdfRgb(scoreColour(row.averageRating)) });
     page.drawText(row.favorablePercent === null ? "" : `${row.favorablePercent}% fav.`, { x: 830, y, size: 9.5, font: fonts.regular, color: pdfRgb(COLORS.slate) });
+    page.drawText(row.enps === null ? "Protected" : `eNPS ${formatSigned(row.enps)}`, { x: 890, y, size: 8.5, font: fonts.bold, color: pdfRgb(COLORS.blue) });
   });
 }
 
@@ -609,6 +615,10 @@ function displayScore(value: number | null) {
 
 function displayPercent(value: number | null) {
   return value === null ? "N/A" : `${value}%`;
+}
+
+function formatSigned(value: number) {
+  return value > 0 ? `+${value}` : String(value);
 }
 
 function scoreColour(value: number | null) {
