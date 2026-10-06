@@ -1341,7 +1341,7 @@ function ReleaseCentre({ surveyId, release, targetRelease, targetEmail, targetNa
   };
   const rows = [
     ["results", "Numerical results", "Scores, participation, benchmarks, and themes", release.resultsReleasedAt],
-    ["insights", "AI-assisted insights", "HR-reviewed highlights and areas to watch", release.insightsReleasedAt],
+    ["insights", "AI-assisted insights", "Publish highlights to every authorised reporting scope", release.insightsReleasedAt],
     ["comments", "Approved comments", "Only comments marked approved by HR", release.commentsReleasedAt],
   ] as const;
   const allGloballyReleased = Boolean(

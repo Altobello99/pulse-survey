@@ -405,14 +405,22 @@ export async function buildResultsData(
     where: { surveyId, scopeKey },
     orderBy: [{ sortOrder: "asc" }, { generatedAt: "asc" }],
   });
+  const insightsReleased = Boolean(viewerRelease.insightsReleasedAt);
   const visibleInsights = storedInsights.length
     ? storedInsights
-        .filter((insight) => access.canManage || insight.status === "approved")
+        .filter(
+          (insight) =>
+            access.canManage ||
+            (insightsReleased && insight.status !== "hidden")
+        )
         .map(serializeInsight)
-    : access.canManage
-      ? generatedInsights.map((insight) => ({ ...insight, id: null, status: "pending" }))
+    : access.canManage || insightsReleased
+      ? generatedInsights.map((insight) => ({
+          ...insight,
+          id: null,
+          status: access.canManage ? "pending" : "approved",
+        }))
       : [];
-  const insightsReleased = Boolean(viewerRelease.insightsReleasedAt);
 
   await writeResultsAudit({
     surveyId,
@@ -478,7 +486,7 @@ export async function buildResultsData(
         : [],
     insightCandidates: access.canManage ? generatedInsights : undefined,
     insightsAwaitingRelease:
-      !access.canManage && (!insightsReleased || visibleInsights.length === 0),
+      !access.canManage && !insightsReleased,
     anonymityThreshold: ANONYMITY_THRESHOLD,
     generatedAt: new Date().toISOString(),
   };

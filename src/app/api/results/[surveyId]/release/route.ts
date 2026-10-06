@@ -50,7 +50,7 @@ export async function POST(
     });
     if (approvedInsights === 0) {
       return Response.json(
-        { error: "Approve at least one AI-assisted insight before releasing insights." },
+        { error: "Approve at least one AI-assisted insight before publishing highlights to every authorised reporting scope." },
         { status: 400 }
       );
     }
