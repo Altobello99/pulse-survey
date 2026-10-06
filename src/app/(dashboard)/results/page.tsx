@@ -1356,9 +1356,9 @@ function ReleaseCentre({ surveyId, release, targetRelease, targetEmail, targetNa
     setBusy("");
   };
   const rows = [
-    ["results", "Numerical results", "Scores, participation, benchmarks, and themes", release.resultsReleasedAt],
-    ["insights", "AI-assisted insights", "Publish highlights to every authorised reporting scope", release.insightsReleasedAt],
-    ["comments", "Approved comments", "Only comments marked approved by HR", release.commentsReleasedAt],
+    ["results", "Numerical Results", "Scores, participation, benchmarks, and themes", release.resultsReleasedAt],
+    ["insights", "AI-Assisted Insights", "Publish highlights to every authorised reporting scope", release.insightsReleasedAt],
+    ["comments", "Anonymous Comments", "Publish all reportable comments except those withheld by HR", release.commentsReleasedAt],
   ] as const;
   const allGloballyReleased = Boolean(
     release.resultsReleasedAt &&
@@ -1383,7 +1383,7 @@ function ReleaseCentre({ surveyId, release, targetRelease, targetEmail, targetNa
                   Manager Test Release
                 </div>
                 <p className="mt-1 text-sm text-blue-900">
-                  Release numerical results, approved insights, and approved comments to {targetName || "the selected manager"} only. This does not publish results to any other leader.
+                  Release numerical results, insights, and reportable comments to {targetName || "the selected manager"} only. This does not publish results to any other leader.
                 </p>
                 <p className="mt-1 text-xs text-blue-800">
                   Access is limited to their BambooHR reporting hierarchy. The minimum of three completions remains enforced, downloads are disabled, and revocation blocks all current and legacy result views.
@@ -1584,7 +1584,7 @@ function formatDateTime(value: string) {
 }
 
 function commentAccessText(data: ResultsData) {
-  if (data.commentAccess.mode === "review") return `${data.commentAccess.totalInScope ?? 0} comments in scope. Approve or withhold comments before releasing them to managers.`;
+  if (data.commentAccess.mode === "review") return `${data.commentAccess.totalInScope ?? 0} comments in scope. Released comments are visible to the appropriate managers unless HR marks them withheld.`;
   if (data.commentAccess.mode === "all") return "Full anonymous comments are available for C-suite review.";
-  return data.commentAccess.released ? "Only comments approved and released by HR are shown." : "HR has not released approved comments yet.";
+  return data.commentAccess.released ? "Anonymous comments released by HR for this reporting scope are shown. Withheld comments remain hidden." : "HR has not released comments yet.";
 }

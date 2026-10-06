@@ -368,7 +368,7 @@ export async function buildResultsData(
     ? textAnswers
         .filter((answer) => {
           if (canSeeAllComments) return true;
-          return allowManagerComments && reviewByAnswer.get(answer.id)?.status === "approved";
+          return allowManagerComments && reviewByAnswer.get(answer.id)?.status !== "withheld";
         })
         .map((answer) => {
           const analysis = analysisByAnswer.get(answer.id);
@@ -474,7 +474,7 @@ export async function buildResultsData(
     themes: reportable ? themes : [],
     comments,
     commentAccess: {
-      mode: access.canManage ? "review" : access.executive ? "all" : "approved_only",
+      mode: access.canManage ? "review" : access.executive ? "all" : "released_scope",
       released: canSeeAllComments ? released : commentsReleased,
       totalInScope: reportable ? textAnswers.length : null,
       visible: comments.length,
