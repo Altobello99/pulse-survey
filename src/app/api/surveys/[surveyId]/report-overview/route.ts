@@ -1,9 +1,9 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { surveyRosterEmployeeWhere } from "@/lib/access";
 import { buildDecisionReportData } from "@/lib/decision-report-analytics";
 import { ANONYMITY_THRESHOLD } from "@/lib/constants";
+import { ensureSurveyRosterSnapshot } from "@/lib/results-roster";
 
 export async function GET(
   _request: Request,
@@ -21,20 +21,20 @@ export async function GET(
   });
   if (!survey) return Response.json({ error: "Survey not found" }, { status: 404 });
 
-  const employeeWhere = surveyRosterEmployeeWhere(survey.startDate);
-  const [employees, responses, completions] = await Promise.all([
-    prisma.user.findMany({
-      where: employeeWhere,
+  await ensureSurveyRosterSnapshot(surveyId);
+  const [roster, responses, completions] = await Promise.all([
+    prisma.surveyRosterSnapshot.findMany({
+      where: { surveyId, eligible: true },
       select: {
         id: true,
+        userId: true,
         email: true,
-        name: true,
         departmentId: true,
-        department: { select: { id: true, name: true } },
+        departmentName: true,
         managerEmail: true,
         location: true,
       },
-      orderBy: { name: "asc" },
+      orderBy: { email: "asc" },
     }),
     prisma.surveyResponse.findMany({
       where: { surveyId },
@@ -48,10 +48,22 @@ export async function GET(
       },
     }),
     prisma.surveyCompletion.findMany({
-      where: { surveyId, user: employeeWhere },
+      where: { surveyId },
       select: { userId: true },
     }),
   ]);
+  const employees = roster.map((employee) => ({
+    id: employee.userId || employee.id,
+    email: employee.email,
+    name: employee.email,
+    departmentId: employee.departmentId,
+    department: {
+      id: employee.departmentId,
+      name: employee.departmentName,
+    },
+    managerEmail: employee.managerEmail,
+    location: employee.location,
+  }));
 
   const managerEmails = [
     ...new Set(

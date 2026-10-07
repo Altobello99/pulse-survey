@@ -8,6 +8,7 @@ import {
 import { ANONYMITY_THRESHOLD, isReportableGroup } from "@/lib/constants";
 import { parseCommentThemes, COMMENT_SEVERITY_RANK } from "@/lib/comment-analysis-types";
 import { DEPARTMENT_GROUPS, departmentBelongsToGroup } from "@/lib/department-groups";
+import { calculateEnps } from "@/lib/enps";
 import { prisma } from "@/lib/prisma";
 import { ensureSurveyRosterSnapshot } from "@/lib/results-roster";
 
@@ -1518,13 +1519,6 @@ function ratingOptions(question: Pick<SurveyQuestion, "options">) {
   } catch {
     return [1, 2, 3, 4, 5];
   }
-}
-
-function calculateEnps(ratings: number[]) {
-  if (!ratings.length) return null;
-  const promoters = ratings.filter((rating) => rating >= 9).length;
-  const detractors = ratings.filter((rating) => rating <= 6).length;
-  return Math.round(((promoters - detractors) / ratings.length) * 100);
 }
 
 function average(values: number[]) {

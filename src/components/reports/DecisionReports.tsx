@@ -10,6 +10,15 @@ type ReportMetrics = {
   averageRating: number | null;
   ratingScaleMax: 5;
   suppressed: boolean;
+  enpsScore: number | null;
+  enpsResponses: number;
+  enpsPromoters: number;
+  enpsPassives: number;
+  enpsDetractors: number;
+  enpsPromotersPercent: number | null;
+  enpsPassivesPercent: number | null;
+  enpsDetractorsPercent: number | null;
+  enpsSuppressed: boolean;
 };
 
 type DepartmentSiteRow = ReportMetrics & {
@@ -41,19 +50,41 @@ type LeaderRow = ReportMetrics & {
   questionAverages: QuestionAverage[];
 };
 
+type DepartmentEnpsRow = ReportMetrics & {
+  id: string;
+  departmentName: string;
+  sites: string[];
+};
+
+type LeaderEnpsRow = ReportMetrics & {
+  id: string;
+  name: string;
+  email: string;
+  departments: string[];
+  sites: string[];
+};
+
 type ReportData = {
   generatedAt: string;
   anonymityThreshold: number;
+  company: ReportMetrics;
   departmentSites: DepartmentSiteRow[];
   leaders: LeaderRow[];
+  enpsDepartments: DepartmentEnpsRow[];
+  enpsLeaders: LeaderEnpsRow[];
   questionAverages: QuestionAverage[];
 };
 
-type ReportTab = "department-site" | "leader-breakdown" | "company-question-averages";
+type ReportTab =
+  | "department-site"
+  | "leader-breakdown"
+  | "enps-breakdown"
+  | "company-question-averages";
 
 const tabs: Array<{ id: ReportTab; label: string }> = [
   { id: "department-site", label: "Department by Site" },
   { id: "leader-breakdown", label: "By Leader" },
+  { id: "enps-breakdown", label: "eNPS Breakdown" },
   { id: "company-question-averages", label: "Question Averages" },
 ];
 
@@ -130,6 +161,14 @@ export function DecisionReports({ surveyId }: { surveyId: string }) {
         )}
         {activeTab === "leader-breakdown" && (
           <LeaderReport surveyId={surveyId} rows={data.leaders} />
+        )}
+        {activeTab === "enps-breakdown" && (
+          <EnpsBreakdownReport
+            surveyId={surveyId}
+            company={data.company}
+            departments={data.enpsDepartments}
+            leaders={data.enpsLeaders}
+          />
         )}
         {activeTab === "company-question-averages" && (
           <QuestionAverageReport surveyId={surveyId} rows={data.questionAverages} />
@@ -316,6 +355,200 @@ function LeaderReport({ surveyId, rows }: { surveyId: string; rows: LeaderRow[] 
           <QuestionAverageTable rows={selectedLeader.questionAverages} />
         </div>
       )}
+    </div>
+  );
+}
+
+type EnpsDisplayRow = ReportMetrics & {
+  id: string;
+  label: string;
+  detail: string;
+  email?: string;
+};
+
+function EnpsBreakdownReport({
+  surveyId,
+  company,
+  departments,
+  leaders,
+}: {
+  surveyId: string;
+  company: ReportMetrics;
+  departments: DepartmentEnpsRow[];
+  leaders: LeaderEnpsRow[];
+}) {
+  const [view, setView] = useState<"department" | "leader">("department");
+  const [search, setSearch] = useState("");
+  const [sort, setSort] = useState("score-desc");
+  const rows = useMemo<EnpsDisplayRow[]>(() => {
+    const source: EnpsDisplayRow[] = view === "department"
+      ? departments.map((row) => ({
+          ...row,
+          label: row.departmentName,
+          detail: row.sites.join(", "),
+        }))
+      : leaders.map((row) => ({
+          ...row,
+          label: row.name,
+          detail: `${formatGroupCount(row.departments.length, "Department")} · ${formatGroupCount(row.sites.length, "Location")}`,
+          email: row.email,
+        }));
+    const query = search.trim().toLowerCase();
+    return source
+      .filter(
+        (row) =>
+          !query ||
+          row.label.toLowerCase().includes(query) ||
+          row.detail.toLowerCase().includes(query) ||
+          row.email?.toLowerCase().includes(query)
+      )
+      .sort((left, right) => sortEnpsRows(left, right, sort));
+  }, [departments, leaders, search, sort, view]);
+
+  return (
+    <div>
+      <ReportHeading
+        title="eNPS Breakdown"
+        description="Audit Employee Net Promoter Score by department or by each leader's full reporting organisation. Scores use the frozen survey roster and the same 0-10 recommendation responses as Results."
+        surveyId={surveyId}
+        reportType="enps-breakdown"
+      />
+
+      <div className="mt-4 border border-slate-200 bg-slate-50 p-4">
+        <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h5 className="font-semibold text-slate-900">Company-Wide eNPS</h5>
+            <p className="text-xs text-slate-500">Reference score from all eligible survey responses</p>
+          </div>
+          <span className={`text-2xl font-bold ${enpsTone(company.enpsScore)}`}>
+            {company.enpsSuppressed ? "Protected" : formatSigned(company.enpsScore)}
+          </span>
+        </div>
+        <div className="mt-4 grid grid-cols-2 gap-px border border-slate-200 bg-slate-200 sm:grid-cols-5">
+          <EnpsSummaryMetric label="Responses" value={String(company.enpsResponses)} />
+          <EnpsSummaryMetric
+            label="Promoters (9-10)"
+            value={formatEnpsCategory(company, company.enpsPromoters, company.enpsPromotersPercent)}
+          />
+          <EnpsSummaryMetric
+            label="Passives (7-8)"
+            value={formatEnpsCategory(company, company.enpsPassives, company.enpsPassivesPercent)}
+          />
+          <EnpsSummaryMetric
+            label="Detractors (0-6)"
+            value={formatEnpsCategory(company, company.enpsDetractors, company.enpsDetractorsPercent)}
+          />
+          <EnpsSummaryMetric
+            label="Participation"
+            value={`${company.completions}/${company.employeeCount} (${company.participationRate}%)`}
+          />
+        </div>
+        {!company.enpsSuppressed && (
+          <p className="mt-3 text-xs text-slate-600">
+            ({company.enpsPromoters} Promoters - {company.enpsDetractors} Detractors) / {company.enpsResponses} Responses x 100 = {formatSigned(company.enpsScore)}
+          </p>
+        )}
+      </div>
+
+      <div className="mt-5 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <span className="mb-1.5 block text-xs font-medium uppercase text-slate-500">Group Results By</span>
+          <div className="inline-flex border border-slate-300 bg-white p-1" aria-label="eNPS report view">
+            <button
+              type="button"
+              onClick={() => setView("department")}
+              className={`px-3 py-1.5 text-sm font-medium ${view === "department" ? "bg-primary text-white" : "text-slate-600 hover:bg-slate-50"}`}
+            >
+              Department
+            </button>
+            <button
+              type="button"
+              onClick={() => setView("leader")}
+              className={`px-3 py-1.5 text-sm font-medium ${view === "leader" ? "bg-primary text-white" : "text-slate-600 hover:bg-slate-50"}`}
+            >
+              Leader
+            </button>
+          </div>
+        </div>
+        <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 lg:max-w-2xl">
+          <SearchField
+            value={search}
+            onChange={setSearch}
+            placeholder={view === "department" ? "Search department or site" : "Search leader or reporting group"}
+          />
+          <FilterSelect label="Sort" value={sort} onChange={setSort}>
+            <option value="score-desc">eNPS: High to Low</option>
+            <option value="score-asc">eNPS: Low to High</option>
+            <option value="responses-desc">Responses: High to Low</option>
+            <option value="participation-desc">Participation: High to Low</option>
+            <option value="name-asc">Name A-Z</option>
+          </FilterSelect>
+        </div>
+      </div>
+
+      <div className="mt-4 overflow-x-auto border border-slate-200">
+        <table className="w-full min-w-[1120px] text-sm">
+          <thead className="bg-slate-50 text-left text-slate-600">
+            <tr>
+              <th className="px-4 py-3 font-medium">{view === "department" ? "Department" : "Leader"}</th>
+              <th className="px-4 py-3 font-medium">Eligible</th>
+              <th className="px-4 py-3 font-medium">Completed</th>
+              <th className="px-4 py-3 font-medium">eNPS Responses</th>
+              <th className="px-4 py-3 font-medium">Promoters</th>
+              <th className="px-4 py-3 font-medium">Passives</th>
+              <th className="px-4 py-3 font-medium">Detractors</th>
+              <th className="px-4 py-3 font-medium">eNPS</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {rows.map((row) => (
+              <tr key={row.id}>
+                <td className="max-w-[300px] px-4 py-3">
+                  <span className="font-medium text-slate-900">{row.label}</span>
+                  <span className="mt-0.5 block text-xs text-slate-500">{row.detail || "Not Listed"}</span>
+                  {row.email && row.email !== row.label && (
+                    <span className="mt-0.5 block text-xs text-slate-400">{row.email}</span>
+                  )}
+                </td>
+                <td className="px-4 py-3 text-slate-600">{row.employeeCount}</td>
+                <td className="px-4 py-3 text-slate-600">
+                  {row.completions}/{row.employeeCount} ({row.participationRate}%)
+                </td>
+                <td className="px-4 py-3 text-slate-600">{row.enpsResponses}</td>
+                <td className="px-4 py-3 text-slate-700">
+                  {formatEnpsCategory(row, row.enpsPromoters, row.enpsPromotersPercent)}
+                </td>
+                <td className="px-4 py-3 text-slate-700">
+                  {formatEnpsCategory(row, row.enpsPassives, row.enpsPassivesPercent)}
+                </td>
+                <td className="px-4 py-3 text-slate-700">
+                  {formatEnpsCategory(row, row.enpsDetractors, row.enpsDetractorsPercent)}
+                </td>
+                <td className={`px-4 py-3 font-bold ${enpsTone(row.enpsScore)}`}>
+                  {row.enpsSuppressed ? (
+                    <span className="font-medium italic text-slate-400">Protected</span>
+                  ) : (
+                    formatSigned(row.enpsScore)
+                  )}
+                </td>
+              </tr>
+            ))}
+            {rows.length === 0 && <EmptyTableRow columns={8} />}
+          </tbody>
+        </table>
+      </div>
+      <p className="mt-3 text-xs text-slate-500">
+        Leader rows include all eligible direct and indirect reports in that leader&apos;s frozen survey reporting organisation. Category counts and scores are protected unless there are at least three completed surveys and three eNPS responses.
+      </p>
+    </div>
+  );
+}
+
+function EnpsSummaryMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0 bg-white px-3 py-3">
+      <span className="block text-xs text-slate-500">{label}</span>
+      <span className="mt-1 block font-semibold text-slate-900">{value}</span>
     </div>
   );
 }
@@ -511,11 +744,42 @@ function sortQuestionRows(left: QuestionAverage, right: QuestionAverage, sort: s
   return left.order - right.order;
 }
 
+function sortEnpsRows(left: EnpsDisplayRow, right: EnpsDisplayRow, sort: string) {
+  if (sort === "score-desc") return score(right.enpsScore) - score(left.enpsScore);
+  if (sort === "score-asc") {
+    return score(left.enpsScore, Number.MAX_SAFE_INTEGER) - score(right.enpsScore, Number.MAX_SAFE_INTEGER);
+  }
+  if (sort === "responses-desc") return right.enpsResponses - left.enpsResponses;
+  if (sort === "participation-desc") return right.participationRate - left.participationRate;
+  return left.label.localeCompare(right.label);
+}
+
+function formatEnpsCategory(
+  metrics: ReportMetrics,
+  count: number,
+  percent: number | null
+) {
+  if (metrics.enpsSuppressed) return "Protected";
+  return `${count} (${percent ?? 0}%)`;
+}
+
+function formatGroupCount(count: number, noun: string) {
+  return `${count} ${noun}${count === 1 ? "" : "s"}`;
+}
+
+function enpsTone(value: number | null) {
+  if (value === null) return "text-slate-400";
+  if (value >= 30) return "text-emerald-700";
+  if (value >= 0) return "text-amber-700";
+  return "text-red-700";
+}
+
 function score(value: number | null, fallback = Number.MIN_SAFE_INTEGER) {
   return value ?? fallback;
 }
 
-function formatSigned(value: number) {
+function formatSigned(value: number | null) {
+  if (value === null) return "N/A";
   return value > 0 ? `+${value}` : String(value);
 }
 

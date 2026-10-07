@@ -9,6 +9,7 @@ import {
   departmentBelongsToGroup,
   findDepartmentGroup,
 } from "@/lib/department-groups";
+import { calculateEnpsBreakdown } from "@/lib/enps";
 
 const BREAKDOWNS = ["overall", "department", "location", "department_location"] as const;
 type Breakdown = (typeof BREAKDOWNS)[number];
@@ -256,12 +257,7 @@ export async function GET(request: NextRequest) {
     completedUserIds.size,
     enpsValues.length
   );
-  const promoters = enpsValues.filter((value) => value >= 9).length;
-  const passives = enpsValues.filter((value) => value >= 7 && value <= 8).length;
-  const detractors = enpsValues.filter((value) => value <= 6).length;
-  const enpsScore = enpsValues.length
-    ? Math.round(((promoters - detractors) / enpsValues.length) * 100)
-    : null;
+  const enps = calculateEnpsBreakdown(enpsValues);
 
   const bestFriendChoices = bestFriendQuestion
     ? responses.flatMap((response) =>
@@ -292,20 +288,14 @@ export async function GET(request: NextRequest) {
         enps: {
           questionText: enpsQuestion?.text || null,
           status: enpsStatus,
-          totalResponses: enpsStatus === "available" ? enpsValues.length : null,
-          score: enpsStatus === "available" ? enpsScore : null,
-          promotersCount: enpsStatus === "available" ? promoters : null,
-          passivesCount: enpsStatus === "available" ? passives : null,
-          detractorsCount: enpsStatus === "available" ? detractors : null,
-          promotersPercent: enpsStatus === "available"
-            ? percentage(promoters, enpsValues.length)
-            : null,
-          passivesPercent: enpsStatus === "available"
-            ? percentage(passives, enpsValues.length)
-            : null,
-          detractorsPercent: enpsStatus === "available"
-            ? percentage(detractors, enpsValues.length)
-            : null,
+          totalResponses: enpsStatus === "available" ? enps.responses : null,
+          score: enpsStatus === "available" ? enps.score : null,
+          promotersCount: enpsStatus === "available" ? enps.promoters : null,
+          passivesCount: enpsStatus === "available" ? enps.passives : null,
+          detractorsCount: enpsStatus === "available" ? enps.detractors : null,
+          promotersPercent: enpsStatus === "available" ? enps.promotersPercent : null,
+          passivesPercent: enpsStatus === "available" ? enps.passivesPercent : null,
+          detractorsPercent: enpsStatus === "available" ? enps.detractorsPercent : null,
         },
         bestFriend: {
           questionText: bestFriendQuestion?.text || null,

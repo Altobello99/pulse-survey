@@ -7,11 +7,13 @@ import { ANONYMITY_THRESHOLD, isReportableGroup } from "@/lib/constants";
 import { surveyRosterEmployeeWhere } from "@/lib/access";
 import { buildDecisionReportData } from "@/lib/decision-report-analytics";
 import { groupTeams, teamGroupIdentity } from "@/lib/team-groups";
+import { ensureSurveyRosterSnapshot } from "@/lib/results-roster";
 import type { Prisma } from "@/generated/prisma/client";
 
 type ReportType =
   | "department-site"
   | "leader-breakdown"
+  | "enps-breakdown"
   | "company-question-averages"
   | "executive-summary"
   | "participation"
@@ -45,6 +47,15 @@ type EmployeeForReport = Prisma.UserGetPayload<{
   };
 }>;
 type CompletionForReport = { userId: string; completedAt: Date };
+type DecisionEmployeeForReport = {
+  id: string;
+  email: string;
+  name: string;
+  departmentId: string;
+  department: { id: string; name: string };
+  managerEmail: string | null;
+  location: string | null;
+};
 type CommentAnalysisForReport = {
   sourceId: string;
   sentiment: string;
@@ -77,6 +88,8 @@ type ReportContext = {
   responses: ResponseForReport[];
   employees: EmployeeForReport[];
   completions: CompletionForReport[];
+  decisionEmployees: DecisionEmployeeForReport[];
+  decisionCompletions: Array<{ userId: string }>;
   commentAnalyses: CommentAnalysisForReport[];
   managerDirectory: ManagerDirectoryEntry[];
 };
@@ -84,6 +97,7 @@ type ReportContext = {
 const reportLabels: Record<ReportType, string> = {
   "department-site": "Department by Site",
   "leader-breakdown": "Breakdown by Leader",
+  "enps-breakdown": "eNPS Breakdown",
   "company-question-averages": "Company Question Averages",
   "executive-summary": "Executive Summary",
   participation: "Participation Report",
@@ -169,6 +183,7 @@ async function buildReportContext(
     },
   });
   if (!survey) return null;
+  await ensureSurveyRosterSnapshot(surveyId);
 
   const responseWhere = applyResponseFilters({ surveyId }, filters);
   const employeeWhere = applyEmployeeFilters(
@@ -176,7 +191,12 @@ async function buildReportContext(
     filters
   );
 
-  const [responses, employees, completions] = await Promise.all([
+  const snapshotWhere = applySnapshotFilters(
+    { surveyId, eligible: true },
+    filters
+  );
+
+  const [responses, employees, completions, decisionRoster, decisionCompletions] = await Promise.all([
     prisma.surveyResponse.findMany({
       where: responseWhere,
       include: {
@@ -199,7 +219,36 @@ async function buildReportContext(
       select: { userId: true, completedAt: true },
       orderBy: { completedAt: "asc" },
     }),
+    prisma.surveyRosterSnapshot.findMany({
+      where: snapshotWhere,
+      select: {
+        id: true,
+        userId: true,
+        email: true,
+        departmentId: true,
+        departmentName: true,
+        managerEmail: true,
+        location: true,
+      },
+      orderBy: { email: "asc" },
+    }),
+    prisma.surveyCompletion.findMany({
+      where: { surveyId },
+      select: { userId: true },
+    }),
   ]);
+  const decisionEmployees = decisionRoster.map((employee) => ({
+    id: employee.userId || employee.id,
+    email: employee.email,
+    name: employee.email,
+    departmentId: employee.departmentId,
+    department: {
+      id: employee.departmentId,
+      name: employee.departmentName,
+    },
+    managerEmail: employee.managerEmail,
+    location: employee.location,
+  }));
   const commentAnswerIds = responses.flatMap((response) =>
     response.answers
       .filter((answer) => Boolean(answer.textValue?.trim()))
@@ -226,7 +275,7 @@ async function buildReportContext(
     : [];
   const managerEmails = [
     ...new Set(
-      [...employees, ...responses]
+      [...employees, ...decisionEmployees, ...responses]
         .map((record) => normalizeEmail(record.managerEmail))
         .filter(Boolean)
     ),
@@ -249,6 +298,8 @@ async function buildReportContext(
     responses,
     employees,
     completions,
+    decisionEmployees,
+    decisionCompletions,
     commentAnalyses,
     managerDirectory,
   };
@@ -260,6 +311,8 @@ function buildReportSheets(context: ReportContext, reportType: ReportType): Repo
       return buildDepartmentSiteReport(context);
     case "leader-breakdown":
       return buildLeaderBreakdownReport(context);
+    case "enps-breakdown":
+      return buildEnpsBreakdownReport(context);
     case "company-question-averages":
       return buildCompanyQuestionAveragesReport(context);
     case "executive-summary":
@@ -414,6 +467,147 @@ function buildLeaderBreakdownReport(context: ReportContext): ReportSheet[] {
   ];
 }
 
+function buildEnpsBreakdownReport(context: ReportContext): ReportSheet[] {
+  const data = getDecisionReportData(context);
+  const companyRows: CellValue[][] = [
+    ...summaryRows(context),
+    [],
+    ["Metric", "Value"],
+    ["Eligible Employees", data.company.employeeCount],
+    ["Completed Surveys", data.company.completions],
+    ["Participation Rate", `${data.company.participationRate}%`],
+    ["eNPS Responses", data.company.enpsResponses],
+    ["Promoters (9-10)", protectedEnpsValue(data.company, data.company.enpsPromoters)],
+    ["Passives (7-8)", protectedEnpsValue(data.company, data.company.enpsPassives)],
+    ["Detractors (0-6)", protectedEnpsValue(data.company, data.company.enpsDetractors)],
+    ["Promoter Percentage", protectedEnpsPercent(data.company, data.company.enpsPromotersPercent)],
+    ["Passive Percentage", protectedEnpsPercent(data.company, data.company.enpsPassivesPercent)],
+    ["Detractor Percentage", protectedEnpsPercent(data.company, data.company.enpsDetractorsPercent)],
+    ["eNPS", protectedEnpsValue(data.company, data.company.enpsScore)],
+    ["Calculation", enpsCalculation(data.company)],
+  ];
+
+  const departmentRows: CellValue[][] = [
+    ...summaryRows(context),
+    [],
+    [
+      "Department",
+      "Sites",
+      "Eligible Employees",
+      "Completed",
+      "Participation Rate",
+      "eNPS Responses",
+      "Promoters (9-10)",
+      "Promoter Percentage",
+      "Passives (7-8)",
+      "Passive Percentage",
+      "Detractors (0-6)",
+      "Detractor Percentage",
+      "eNPS",
+      "Calculation",
+      "Privacy",
+    ],
+  ];
+  for (const row of data.enpsDepartments) {
+    departmentRows.push([
+      row.departmentName,
+      row.sites.join("; "),
+      row.employeeCount,
+      row.completions,
+      `${row.participationRate}%`,
+      row.enpsResponses,
+      protectedEnpsValue(row, row.enpsPromoters),
+      protectedEnpsPercent(row, row.enpsPromotersPercent),
+      protectedEnpsValue(row, row.enpsPassives),
+      protectedEnpsPercent(row, row.enpsPassivesPercent),
+      protectedEnpsValue(row, row.enpsDetractors),
+      protectedEnpsPercent(row, row.enpsDetractorsPercent),
+      protectedEnpsValue(row, row.enpsScore),
+      enpsCalculation(row),
+      enpsPrivacyLabel(row),
+    ]);
+  }
+
+  const leaderRows: CellValue[][] = [
+    ...summaryRows(context),
+    [],
+    [
+      "Leader",
+      "Leader Email",
+      "Scope",
+      "Departments",
+      "Sites",
+      "Eligible Employees",
+      "Completed",
+      "Participation Rate",
+      "eNPS Responses",
+      "Promoters (9-10)",
+      "Promoter Percentage",
+      "Passives (7-8)",
+      "Passive Percentage",
+      "Detractors (0-6)",
+      "Detractor Percentage",
+      "eNPS",
+      "Calculation",
+      "Privacy",
+    ],
+  ];
+  for (const row of data.enpsLeaders) {
+    leaderRows.push([
+      row.name,
+      row.email,
+      "Full Reporting Organisation",
+      row.departments.join("; "),
+      row.sites.join("; "),
+      row.employeeCount,
+      row.completions,
+      `${row.participationRate}%`,
+      row.enpsResponses,
+      protectedEnpsValue(row, row.enpsPromoters),
+      protectedEnpsPercent(row, row.enpsPromotersPercent),
+      protectedEnpsValue(row, row.enpsPassives),
+      protectedEnpsPercent(row, row.enpsPassivesPercent),
+      protectedEnpsValue(row, row.enpsDetractors),
+      protectedEnpsPercent(row, row.enpsDetractorsPercent),
+      protectedEnpsValue(row, row.enpsScore),
+      enpsCalculation(row),
+      enpsPrivacyLabel(row),
+    ]);
+  }
+
+  return [
+    { name: "Company-Wide eNPS", rows: companyRows },
+    { name: "eNPS by Department", rows: departmentRows },
+    { name: "eNPS by Leader", rows: leaderRows },
+  ];
+}
+
+function protectedEnpsValue(
+  metrics: ReturnType<typeof getDecisionReportData>["company"],
+  value: number | null
+) {
+  return metrics.enpsSuppressed ? "Protected" : value;
+}
+
+function protectedEnpsPercent(
+  metrics: ReturnType<typeof getDecisionReportData>["company"],
+  value: number | null
+) {
+  return metrics.enpsSuppressed || value === null ? "Protected" : `${value}%`;
+}
+
+function enpsCalculation(metrics: ReturnType<typeof getDecisionReportData>["company"]) {
+  return metrics.enpsSuppressed
+    ? "Protected"
+    : `(${metrics.enpsPromoters} promoters - ${metrics.enpsDetractors} detractors) / ${metrics.enpsResponses} responses x 100 = ${metrics.enpsScore}`;
+}
+
+function enpsPrivacyLabel(metrics: ReturnType<typeof getDecisionReportData>["company"]) {
+  return metrics.enpsSuppressed
+    ? `Protected: fewer than ${ANONYMITY_THRESHOLD} completions or eNPS responses`
+    : `Minimum of ${ANONYMITY_THRESHOLD} completions met`;
+}
+
 function buildCompanyQuestionAveragesReport(context: ReportContext): ReportSheet[] {
   const data = getDecisionReportData(context);
   const rows: CellValue[][] = [
@@ -465,9 +659,9 @@ function buildCompanyQuestionAveragesReport(context: ReportContext): ReportSheet
 function getDecisionReportData(context: ReportContext) {
   return buildDecisionReportData({
     questions: context.survey.questions,
-    employees: context.employees,
+    employees: context.decisionEmployees,
     responses: context.responses,
-    completions: context.completions,
+    completions: context.decisionCompletions,
     managerDirectory: context.managerDirectory,
   });
 }
@@ -1070,6 +1264,19 @@ function applyResponseFilters(where: Prisma.SurveyResponseWhereInput, filters: R
 
 function applyEmployeeFilters(where: Prisma.UserWhereInput, filters: ReportFilters) {
   const clauses: Prisma.UserWhereInput[] = [where];
+  if (filters.departmentId) clauses.push({ departmentId: filters.departmentId });
+  if (filters.division) clauses.push({ division: filters.division });
+  if (filters.teamIds) clauses.push({ teamId: { in: filters.teamIds } });
+  else if (filters.teamId) clauses.push({ teamId: filters.teamId });
+  if (filters.location) clauses.push({ location: filters.location });
+  return clauses.length === 1 ? where : { AND: clauses };
+}
+
+function applySnapshotFilters(
+  where: Prisma.SurveyRosterSnapshotWhereInput,
+  filters: ReportFilters
+) {
+  const clauses: Prisma.SurveyRosterSnapshotWhereInput[] = [where];
   if (filters.departmentId) clauses.push({ departmentId: filters.departmentId });
   if (filters.division) clauses.push({ division: filters.division });
   if (filters.teamIds) clauses.push({ teamId: { in: filters.teamIds } });

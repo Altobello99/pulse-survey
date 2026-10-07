@@ -10,6 +10,7 @@ import { ANONYMITY_THRESHOLD, isReportableGroup } from "@/lib/constants";
 import { parseCommentThemes } from "@/lib/comment-analysis-types";
 import { buildDailyParticipation } from "@/lib/participation";
 import { getSurveyResultsReleaseAccess } from "@/lib/results-analytics";
+import { calculateEnps } from "@/lib/enps";
 
 export async function GET() {
   const session = await getServerSession(authOptions);
@@ -204,7 +205,9 @@ export async function GET() {
         recommendationAverage: recommendationRatings.length
           ? average(recommendationRatings)
           : null,
-        enps: recommendationRatings.length ? calculateEnps(recommendationRatings) : null,
+        enps: isReportableGroup(recommendationRatings.length)
+          ? calculateEnps(recommendationRatings)
+          : null,
         friendYesPercent: friendChoices.length
           ? Math.round(
               (friendChoices.filter((choice) => choice === "yes").length /
@@ -278,12 +281,6 @@ function ratingOptions(options: string | null) {
   } catch {
     return [1, 2, 3, 4, 5];
   }
-}
-
-function calculateEnps(ratings: number[]) {
-  const promoters = ratings.filter((rating) => rating >= 9).length;
-  const detractors = ratings.filter((rating) => rating <= 6).length;
-  return Math.round(((promoters - detractors) / ratings.length) * 100);
 }
 
 function average(values: number[]) {
